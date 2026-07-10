@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0B1F3A" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>비즈솔루션본부 OOH</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+<style>
+  :root{
+    --ink:#0B1F3A; --bg:#F5F6F8; --surface:#FFFFFF; --line:#E4E7EC;
+    --muted:#5A6678; --faint:#8A94A6; --gold:#B8862B; --gold-soft:#F3E9D2;
+    --ok:#1F9D6B; --busy:#D98A2B; --tight:#D14545;
+    --ok-soft:#E4F4ED; --busy-soft:#FBEEDB; --tight-soft:#FBE3E3;
+    --paid:#0B1F3A; --svc:#B9C2CE; --own:#B8862B;
+    --shadow:0 1px 2px rgba(11,31,58,.06), 0 8px 24px rgba(11,31,58,.06);
+    --radius:14px; --maxw:440px; --pad:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  input{font-family:inherit;}
+  a{text-decoration:none;color:inherit;}
+
+  .app-frame{max-width:var(--maxw);margin:0 auto;min-height:100dvh;background:var(--bg);
+    position:relative;box-shadow:0 0 60px rgba(11,31,58,.08);}
+  .app{display:flex;flex-direction:column;min-height:100dvh;}
+
+  /* ---------- TOP BAR ---------- */
+  .topbar{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff;
+    padding:calc(env(safe-area-inset-top) + 15px) var(--pad) 15px;
+    display:flex;align-items:center;justify-content:space-between;}
+  .tb-title{font-weight:800;font-size:16.5px;letter-spacing:-.03em;}
+  .tb-sub{font-size:11.5px;color:#9fb0c8;margin-top:1px;}
+
+  .scroll{flex:1;padding:18px var(--pad) 96px;}
+  .view{display:none;}
+  .view.active{display:block;animation:fade .22s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(5px);}to{opacity:1;transform:none;}}
+
+  .view-head{margin:2px 0 15px;}
+  .view-head h2{font-size:21px;font-weight:800;letter-spacing:-.03em;margin:0;}
+  .view-head .vsub{color:var(--muted);font-size:12.5px;margin-top:3px;}
+
+  .src{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:99px;margin-left:5px;vertical-align:1px;}
+  .src.live{background:var(--ok-soft);color:var(--ok);}
+  .src.demo{background:var(--busy-soft);color:var(--busy);}
+
+  /* ---------- TABS ---------- */
+  .tabrow{display:flex;gap:6px;margin:0 0 10px;}
+  .tab{flex:1 1 0;min-width:0;padding:9px 4px;border-radius:10px;font-size:13px;font-weight:800;
+    letter-spacing:-.02em;background:var(--surface);border:1px solid var(--line);color:var(--muted);
+    transition:all .14s;white-space:nowrap;text-align:center;}
+  .tab.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .tabrow.date{margin-bottom:16px;overflow-x:auto;scrollbar-width:none;}
+  .tabrow.date::-webkit-scrollbar{display:none;}
+  .tab.sm{flex:0 0 auto;padding:7px 13px;font-size:12.5px;border-radius:9px;}
+  .tab.sm.on{background:var(--gold);color:var(--ink);border-color:var(--gold);}
+  .tab-empty{font-size:12px;color:var(--faint);padding:7px 2px;}
+
+  /* ---------- SUMMARY ---------- */
+  .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px;}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:13px 12px;box-shadow:var(--shadow);}
+  .stat .num{font-size:22px;font-weight:800;letter-spacing:-.03em;line-height:1;}
+  .stat .num small{font-size:13px;font-weight:700;color:var(--faint);margin-left:1px;}
+  .stat .lab{font-size:11px;color:var(--muted);margin-top:6px;font-weight:500;}
+
+  /* ---------- TABLE (엑셀 '▷ 편성표' 블록 재현) ---------- */
+  .tbl-wrap{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);overflow-x:auto;}
+  .tbl{width:100%;border-collapse:collapse;}
+  .tbl thead th{font-size:10.5px;font-weight:800;color:var(--faint);text-align:left;padding:10px 8px;
+    background:#FAFBFC;border-bottom:1px solid var(--line);white-space:nowrap;}
+  .tbl th.th-no{text-align:center;padding-left:12px;width:44px;}
+  .tbl th.th-num,.tbl th.th-date{text-align:right;}
+  .tbl th.th-cat{text-align:center;}
+  .tbl th.th-note{padding-right:14px;}
+  .tbl tbody tr{border-bottom:1px solid #F2F4F6;cursor:pointer;transition:background .12s;}
+  .tbl tbody tr:last-child{border-bottom:none;}
+  .tbl tbody tr:hover{background:#F7F9FB;}
+  .tbl tbody tr.r-svc{background:#FDF6F1;}          /* 공익·건물주 = 원본의 연주황 행 */
+  .tbl tbody tr.r-svc:hover{background:#FBF0E8;}
+  .tbl td{padding:11px 8px;vertical-align:middle;}
+  .td-no{text-align:center;padding-left:12px !important;font-size:11.5px;font-weight:700;
+    color:var(--faint);font-variant-numeric:tabular-nums;}
+  .td-adv{min-width:150px;}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:7px;vertical-align:1px;}
+  .dot.lg{width:9px;height:9px;margin-right:8px;vertical-align:2px;}
+  .adv-name{font-size:13px;font-weight:700;letter-spacing:-.02em;}
+  .new-tag{font-size:9px;font-weight:800;color:#fff;background:var(--tight);
+    padding:1px 5px;border-radius:4px;margin-left:5px;vertical-align:1px;}
+  .adv-sub{display:block;font-size:10.5px;color:var(--faint);margin:3px 0 0 14px;}
+  .td-num{text-align:right;font-size:12.5px;font-weight:700;color:var(--muted);
+    white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .td-date{text-align:right;font-size:11.5px;color:var(--muted);white-space:nowrap;
+    font-variant-numeric:tabular-nums;}
+  .td-cat{text-align:center;}
+  .cat-pill{font-size:11px;font-weight:800;white-space:nowrap;}
+  .td-note{font-size:11px;color:var(--faint);padding-right:14px !important;max-width:120px;}
+  .sync{font-size:9.5px;font-weight:800;color:var(--gold);}
+  .d-soon{display:inline-block;font-size:10.5px;font-weight:800;color:var(--tight);
+    background:var(--tight-soft);padding:3px 7px;border-radius:6px;white-space:nowrap;}
+  .d-far{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
+  .d-gone{font-size:11px;color:var(--faint);}
+  .tbl-foot{font-size:11.5px;color:var(--faint);text-align:center;margin-top:11px;}
+
+  /* 좁은 화면에서는 상세 컬럼을 접고, 광고주 줄 아래 요약(adv-sub)으로 대체 */
+  .col-run,.col-date,.col-cat,.col-note{display:none;}
+  @media (min-width:620px){
+    .col-cat{display:table-cell;}
+    .adv-sub{display:none;}
+    .col-run{display:table-cell;}
+  }
+  @media (min-width:820px){
+    .col-date{display:table-cell;}
+  }
+  @media (min-width:1000px){
+    .col-note{display:table-cell;}
+  }
+
+  /* ---------- 매체현황: 도넛 카드 ---------- */
+  .media-grid{display:grid;grid-template-columns:1fr;gap:11px;}
+  .media-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;box-shadow:var(--shadow);cursor:pointer;transition:transform .1s,box-shadow .15s;position:relative;}
+  .media-card:hover{box-shadow:0 4px 12px rgba(11,31,58,.10),0 12px 32px rgba(11,31,58,.08);}
+  .media-card:active{transform:scale(.994);}
+  .mc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+  .mc-name{font-size:16px;font-weight:800;letter-spacing:-.02em;}
+  .mc-type{font-size:11.5px;color:var(--faint);margin-top:2px;}
+  .badge{font-size:11px;font-weight:800;padding:4px 9px;border-radius:99px;white-space:nowrap;}
+  .badge.ok{background:var(--ok-soft);color:var(--ok);}
+  .badge.warn{background:var(--busy-soft);color:var(--busy);}
+  .badge.danger{background:var(--tight-soft);color:var(--tight);}
+  .mc-body{display:flex;align-items:center;gap:18px;}
+  .donut{width:104px;height:104px;border-radius:50%;flex:0 0 auto;position:relative;
+    display:flex;align-items:center;justify-content:center;}
+  .donut::after{content:"";position:absolute;inset:13px;background:var(--surface);border-radius:50%;}
+  .donut-center{position:relative;z-index:1;text-align:center;}
+  .donut-pct{font-size:19px;font-weight:800;letter-spacing:-.04em;line-height:1;}
+  .donut-lab{font-size:9.5px;color:var(--faint);margin-top:3px;font-weight:600;}
+  .legend{flex:1;min-width:0;}
+  .legend-item{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12.5px;}
+  .legend-item + .legend-item{border-top:1px solid #F2F4F6;}
+  .legend-left{display:flex;align-items:center;gap:7px;color:var(--muted);}
+  .legend-dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto;}
+  .legend-val{font-weight:800;font-variant-numeric:tabular-nums;}
+  .click-hint{display:block;text-align:right;font-size:11px;color:var(--faint);margin-top:11px;font-weight:600;}
+
+  /* ---------- 문서 카드 ---------- */
+  .searchbar{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);
+    border-radius:12px;padding:12px 14px;margin-bottom:14px;box-shadow:var(--shadow);}
+  .searchbar input{flex:1;border:none;outline:none;font-size:14.5px;background:none;color:var(--ink);}
+  .searchbar .ico{color:var(--faint);font-size:16px;}
+  .doc-grid{display:grid;grid-template-columns:1fr;gap:10px;}
+  .doc{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px 15px;box-shadow:var(--shadow);display:flex;align-items:center;gap:13px;}
+  .ficon{width:42px;height:42px;border-radius:10px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+    font-size:10.5px;font-weight:800;color:#fff;}
+  .ficon.pdf{background:#D14545;} .ficon.pptx,.ficon.ppt{background:#D98A2B;}
+  .ficon.xlsx,.ficon.xls{background:#1F9D6B;} .ficon.other{background:#8A94A6;}
+  .dmeta{flex:1;min-width:0;}
+  .dname{font-size:13.5px;font-weight:700;letter-spacing:-.02em;line-height:1.35;}
+  .dsub{font-size:11px;color:var(--faint);margin-top:3px;}
+  .dacts{display:flex;gap:6px;flex:0 0 auto;}
+  .dbtn{font-size:11.5px;font-weight:700;padding:7px 10px;border-radius:9px;border:1px solid var(--line);
+    color:var(--muted);background:var(--surface);white-space:nowrap;transition:all .13s;}
+  .dbtn:hover{border-color:var(--ink);color:var(--ink);}
+  .dbtn.dl{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .dbtn.dl:hover{filter:brightness(1.12);color:#fff;}
+
+  /* ---------- 게첨자료 ---------- */
+  .filt-label{font-size:10.5px;font-weight:800;color:var(--faint);margin:0 0 6px;letter-spacing:.02em;}
+  .chiprow{display:flex;gap:6px;overflow-x:auto;margin:0 -16px 12px;padding:1px 16px 4px;scrollbar-width:none;}
+  .chiprow::-webkit-scrollbar{display:none;}
+  .chip{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;
+    font-size:12.5px;font-weight:700;letter-spacing:-.02em;white-space:nowrap;
+    background:var(--surface);border:1px solid var(--line);color:var(--muted);transition:all .13s;}
+  .chip.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .chip .cn{font-size:10.5px;font-weight:800;opacity:.65;}
+  .chip.on .cn{opacity:.8;}
+  .idot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+  .list-meta{font-size:12px;color:var(--faint);margin:0 0 10px;display:flex;
+    justify-content:space-between;align-items:center;gap:10px;}
+  .list-meta b{color:var(--ink);font-weight:800;}
+  .seg{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:2px;}
+  .seg-b{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:7px;color:var(--muted);}
+  .seg-b.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(11,31,58,.08);}
+  .itag{font-size:9.5px;font-weight:800;border:1px solid;border-radius:5px;padding:2px 6px;background:#fff;}
+  .mtag.dt{color:var(--faint);}
+  .grp-head{font-size:11.5px;font-weight:800;color:var(--muted);margin:16px 0 8px;
+    display:flex;align-items:center;gap:7px;}
+  .grp-head .idot{margin-right:1px;}
+  .grp-head:first-child{margin-top:0;}
+  .grp-n{background:var(--bg);border:1px solid var(--line);border-radius:99px;
+    padding:1px 7px;font-size:10.5px;color:var(--faint);}
+  .asset{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+    padding:13px 14px;margin-bottom:8px;box-shadow:var(--shadow);cursor:pointer;
+    display:flex;align-items:center;gap:10px;transition:border-color .13s;}
+  .asset:hover{border-color:var(--ink);}
+  .ameta{flex:1;min-width:0;}
+  .aname{font-size:14px;font-weight:800;letter-spacing:-.02em;display:flex;align-items:center;gap:6px;}
+  .sync-tag{font-size:9.5px;font-weight:800;color:var(--gold);background:var(--gold-soft);
+    padding:2px 6px;border-radius:5px;}
+  .atags{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap;align-items:center;}
+  .mtag{font-size:10px;font-weight:800;color:var(--muted);background:var(--bg);
+    border:1px solid var(--line);border-radius:5px;padding:2px 7px;}
+  .asset .arrow{color:var(--faint);font-size:19px;flex:0 0 auto;}
+  #assetFilter{margin-bottom:12px;}
+
+  .notice{background:var(--gold-soft);border:1px solid #E8D7AE;border-radius:12px;
+    padding:12px 14px;font-size:12.5px;color:#6b531c;line-height:1.6;margin-bottom:16px;}
+  .notice b{font-weight:800;}
+  .empty{text-align:center;padding:44px 20px;color:var(--faint);font-size:13px;}
+
+  /* ---------- SHEET ---------- */
+  .sheet-bg{position:fixed;inset:0;background:rgba(11,31,58,.45);z-index:60;opacity:0;pointer-events:none;
+    transition:opacity .25s;backdrop-filter:blur(2px);}
+  .sheet-bg.show{opacity:1;pointer-events:auto;}
+  .sheet{position:absolute;left:0;right:0;bottom:0;max-width:var(--maxw);margin:0 auto;background:var(--surface);
+    border-radius:22px 22px 0 0;transform:translateY(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);
+    max-height:88dvh;overflow-y:auto;padding:8px 20px calc(env(safe-area-inset-bottom) + 24px);}
+  .sheet.show{transform:translateY(0);}
+  .grab{width:40px;height:4px;border-radius:99px;background:var(--line);margin:8px auto 14px;}
+  .sheet h3{font-size:19.5px;font-weight:800;letter-spacing:-.03em;margin:0;display:flex;align-items:center;}
+  .sheet .s-type{color:var(--muted);font-size:12.5px;margin:4px 0 16px;}
+  .spec-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .spec{background:var(--bg);border-radius:11px;padding:12px 13px;}
+  .spec .k{font-size:11px;color:var(--faint);font-weight:600;}
+  .spec .v{font-size:14px;font-weight:700;margin-top:3px;letter-spacing:-.01em;}
+  .spec.full{grid-column:1/-1;}
+  .period{display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:12px;padding:14px;margin-bottom:16px;}
+  .p-side{flex:0 0 auto;} .p-side.r{text-align:right;}
+  .p-k{font-size:10.5px;color:var(--faint);font-weight:700;}
+  .p-v{font-size:13px;font-weight:800;letter-spacing:-.02em;margin-top:2px;white-space:nowrap;}
+  .p-mid{flex:1;text-align:center;}
+  .p-days{font-size:11px;font-weight:800;color:var(--muted);}
+  .p-bar{height:3px;border-radius:99px;background:linear-gradient(90deg,var(--ink),var(--gold));margin:6px 0;}
+  .p-left{font-size:10.5px;font-weight:800;color:var(--faint);}
+  .p-left.soon{color:var(--tight);}
+  .sheet-actions{display:flex;gap:9px;}
+  .sa{flex:1;padding:14px;border-radius:12px;font-weight:700;font-size:14px;text-align:center;}
+  .sa.primary{background:var(--ink);color:#fff;}
+  .sa.ghost{background:var(--bg);color:var(--ink);border:1px solid var(--line);}
+  .sect-label{font-size:12px;font-weight:800;color:var(--muted);margin:16px 0 9px;}
+  .padv{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #F2F4F6;font-size:13px;}
+  .padv:last-child{border-bottom:none;}
+  .padv .pa-n{font-weight:700;letter-spacing:-.02em;}
+  .pa-x{font-size:10px;font-weight:800;color:var(--faint);background:var(--bg);
+    border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px;}
+  .padv .pa-s{color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums;font-size:12.5px;}
+
+  /* ---------- BOTTOM NAV ---------- */
+  .nav{position:sticky;bottom:0;z-index:30;background:rgba(255,255,255,.93);backdrop-filter:blur(12px);
+    border-top:1px solid var(--line);display:flex;padding:8px 6px calc(env(safe-area-inset-bottom) + 8px);}
+  .nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0;color:var(--faint);transition:color .15s;}
+  .nav button .ni{font-size:20px;line-height:1;}
+  .nav button .nl{font-size:10.5px;font-weight:700;letter-spacing:-.02em;}
+  .nav button.on{color:var(--ink);}
+
+  /* ============ 반응형: 태블릿 ============ */
+  @media (min-width:700px){
+    :root{ --maxw:760px; --pad:24px; }
+    .app-frame{box-shadow:none;}
+    .media-grid{grid-template-columns:1fr 1fr;}
+    .doc-grid{grid-template-columns:1fr 1fr;}
+    .sheet{max-width:560px;border-radius:22px;bottom:auto;top:50%;transform:translate(0,-40%) scale(.97);
+      opacity:0;left:50%;margin-left:-280px;max-height:82dvh;}
+    .sheet.show{transform:translate(0,-50%) scale(1);opacity:1;}
+    .grab{display:none;}
+  }
+
+  /* ============ 반응형: 데스크톱 ============ */
+  @media (min-width:1000px){
+    :root{ --maxw:1120px; --pad:32px; }
+    body{background:#EEF0F3;}
+    .app-frame{background:var(--bg);min-height:100vh;}
+    .app{min-height:100vh;}
+
+    /* 하단 탭바 → 상단 탭바 (헤더 아래에 붙임) */
+    .topbar{order:-2;position:static;}          /* 헤더가 항상 맨 위 */
+    .nav{order:-1;position:sticky;top:0;bottom:auto;border-top:none;border-bottom:1px solid var(--line);
+      padding:0 var(--pad);gap:2px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);}
+    .nav button{flex:0 0 auto;flex-direction:row;gap:8px;padding:15px 20px;border-bottom:2px solid transparent;
+      font-size:14px;}
+    .nav button .ni{font-size:15px;}
+    .nav button .nl{font-size:13.5px;}
+    .nav button.on{border-bottom-color:var(--ink);}
+
+    .topbar{padding:16px var(--pad);}
+    .scroll{padding:28px var(--pad) 60px;max-width:1120px;margin:0 auto;width:100%;}
+    .view-head h2{font-size:25px;}
+    .summary{max-width:560px;}
+    .media-grid{grid-template-columns:repeat(3,1fr);}
+    .doc-grid{grid-template-columns:repeat(2,1fr);}
+    .asset-list{column-count:2;column-gap:12px;}
+    .asset,.grp-head{break-inside:avoid;}
+    .tabrow{max-width:640px;}
+    .tbl thead th,.tbl td{padding:13px 12px;}
+    .adv-name{font-size:13.5px;}
+    .tbl-wrap{max-width:100%;}
+  }
+  @media (min-width:1360px){
+    :root{ --maxw:1280px; }
+    .doc-grid{grid-template-columns:repeat(3,1fr);}
+  }
+</style>
+</head>
+<body>
+<div class="app-frame">
+  <div class="app" id="app">
+
+    <header class="topbar">
+      <div>
+        <div class="tb-title">비즈솔루션본부 OOH</div>
+        <div class="tb-sub">영업 지원 대시보드</div>
+      </div>
+    </header>
+
+    <main class="scroll">
+
+      <!-- ===== 편성표 ===== -->
+      <section class="view active" id="v-sched">
+        <div class="view-head">
+          <h2>매체 편성표</h2>
+          <div class="vsub" id="schedMeta">—</div>
+        </div>
+        <div class="tabrow" id="schedChips"></div>
+        <div class="tabrow date" id="dateChips"></div>
+        <div class="summary" id="schedStats"></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr>
+              <th class="th-no">No.</th>
+              <th class="th-adv">광고주명</th>
+              <th class="th-num col-run">러닝타임</th>
+              <th class="th-num">구좌</th>
+              <th class="th-date col-date">시작일</th>
+              <th class="th-date">종료일</th>
+              <th class="th-cat col-cat">구분</th>
+              <th class="th-note col-note">비고</th>
+            </tr></thead>
+            <tbody id="advBody"></tbody>
+          </table>
+        </div>
+        <div class="tbl-foot">행을 누르면 집행 기간과 상세가 열립니다.</div>
+      </section>
+
+      <!-- ===== 매체현황 ===== -->
+      <section class="view" id="v-media">
+        <div class="view-head">
+          <h2>매체 현황</h2>
+          <div class="vsub" id="mediaMeta">매체별 구좌 점유 현황</div>
+        </div>
+        <div class="media-grid" id="mediaGrid"></div>
+      </section>
+
+      <!-- ===== 매체소개서 ===== -->
+      <section class="view" id="v-docs">
+        <div class="view-head">
+          <h2>매체소개서</h2>
+          <div class="vsub">제안 현장에서 바로 공유하세요</div>
+        </div>
+        <div class="searchbar">
+          <span class="ico">⌕</span>
+          <input type="text" id="docSearch" placeholder="파일명으로 검색" oninput="renderDocs()" />
+        </div>
+        <div class="doc-grid" id="docGrid"></div>
+      </section>
+
+      <!-- ===== 게첨자료 ===== -->
+      <section class="view" id="v-assets">
+        <div class="view-head">
+          <h2>게첨자료</h2>
+          <div class="vsub">캠페인을 누르면 게첨 파일을 내려받을 수 있습니다</div>
+        </div>
+        <div id="assetNotice"></div>
+        <div class="filt-label">매체</div>
+        <div class="chiprow" id="assetFilter"></div>
+        <div class="filt-label">업종</div>
+        <div class="chiprow" id="industryFilter"></div>
+        <div class="searchbar">
+          <span class="ico">⌕</span>
+          <input type="text" id="assetSearch" placeholder="광고주명·업종으로 검색" oninput="renderAssets()" />
+        </div>
+        <div class="list-meta">
+          <span>총 <b id="assetCount">—</b></span>
+          <span class="seg">
+            <button id="segDate" class="seg-b on" onclick="setAssetGroup('date')">날짜순</button>
+            <button id="segInd"  class="seg-b" onclick="setAssetGroup('industry')">업종별</button>
+          </span>
+        </div>
+        <div class="asset-list" id="assetGrid"></div>
+      </section>
+
+    </main>
+
+    <nav class="nav">
+      <button class="on" data-v="v-sched"  onclick="switchView(this)"><span class="ni">▤</span><span class="nl">편성표</span></button>
+      <button data-v="v-media"  onclick="switchView(this)"><span class="ni">◑</span><span class="nl">매체현황</span></button>
+      <button data-v="v-docs"   onclick="switchView(this)"><span class="ni">▥</span><span class="nl">매체소개서</span></button>
+      <button data-v="v-assets" onclick="switchView(this)"><span class="ni">▼</span><span class="nl">게첨자료</span></button>
+    </nav>
+  </div>
+
+  <div class="sheet-bg" id="sheetBg" onclick="closeSheet()">
+    <div class="sheet" id="sheet" onclick="event.stopPropagation()">
+      <div class="grab"></div>
+      <div id="sheetBody"></div>
+    </div>
+  </div>
+</div>
+<script>
+/* =========================================================
+   비즈솔루션본부 OOH — 영업 지원 대시보드
+   데이터: Apps Script(Code.gs) → 편성표 시트 + 드라이브 폴더
+   URL 이 비었거나 실패하면 아래 예시 데이터로 동작합니다.
+   ========================================================= */
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwJjYyGr-97mS4XDGZxSdy5FZiBPybVWcXHIPYf1L6GBC7ALUCspuTwNioXmxNmen0hA/exec';
+
+let dataSource = 'demo';
+let loadErrors = {};
+
+const venues = [
+  { id:'cmt',     short:'CMT',  name:'코엑스 미디어타워',   type:'대형 LED 미디어타워', loc:'삼성동 코엑스',      hours:'06:00~24:00', cycle:'1일 102 cycle' },
+  { id:'pmt',     short:'PMT',  name:'파르나스 미디어타워', type:'대형 LED 미디어타워', loc:'삼성동 파르나스타워', hours:'06:00~24:00', cycle:'1일 107 cycle' },
+  { id:'amazing', short:'AP',   name:'어메이징 파르나스',   type:'프리미엄 몰 미디어',  loc:'파르나스몰',        hours:'07:00~23:00', cycle:'1일 131 cycle' },
+  { id:'curved',  short:'CW',   name:'커브드월 홍대',      type:'대형 곡면 LED',      loc:'홍대입구',          hours:'06:00~24:00', cycle:'1일 102 cycle' },
+  { id:'t204',    short:'T204', name:'T204',              type:'복합문화공간 미디어', loc:'성수동 T204',       hours:'06:00~24:00', cycle:'1일 112 cycle' },
+];
+
+/* 편성 데이터 — 엑셀의 '▷ 편성표' 블록을 행 그대로 옮긴 것
+   d=기준일 v=매체 no=No. a=광고주명 r=러닝타임(초) s=구좌 st/en=기간 c=구분 n=비고
+   (같은 광고주가 여러 구좌에 편성되면 원본처럼 여러 줄로 나옵니다) */
+const sched = [
+  {d:'2026-07-10',v:'cmt',no:'2',a:"헤드라인 뉴스",r:60,s:1,st:'2026-07-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'3',a:"PCD",r:30,s:1,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'6',a:"LG그룹",r:30,s:1,st:'2026-05-01',en:'2027-04-30',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'7',a:"플러스엠 <호프>",r:15,s:1,st:'2026-06-25',en:'2026-07-24',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'8',a:"트렌드뉴스_하이엔드",r:50,s:0.5,st:'2026-07-08',en:'2026-07-14',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'11',a:"트렌드뉴스_컬쳐(헬스키친)",r:30,s:1,st:'2026-06-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'12',a:"타임폴리오자산운용",r:15,s:0.5,st:'2026-06-15',en:'2026-08-14',c:'상업',n:"1"},
+  {d:'2026-07-10',v:'cmt',no:'14',a:"그라프",r:15,s:1,st:'2026-07-03',en:'2026-08-02',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'15',a:"케이팝 시즌 콘텐트",r:30,s:0.5,st:'2026-07-01',en:'2026-07-10',c:'공익',n:"A"},
+  {d:'2026-07-10',v:'cmt',no:'16',a:"케이팝 시즌 콘텐트",r:30,s:0.5,st:'2026-07-04',en:'2026-07-10',c:'공익',n:"B"},
+  {d:'2026-07-10',v:'cmt',no:'17',a:"타사키",r:15,s:1,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'19',a:"LG그룹",r:30,s:1,st:'2026-05-01',en:'2027-04-30',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'24',a:"플러스엠 <호프>",r:15,s:1,st:'2026-06-25',en:'2026-07-24',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'26',a:"하나은행(퇴직연금)",r:15,s:1,st:'2026-07-10',en:'2026-10-09',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'27',a:"강남구_행복일자리박람회",r:30,s:0.5,st:'2026-07-07',en:'2026-07-15',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'29',a:"텐센트 아린",r:20,s:1,st:'2026-07-07',en:'2026-07-10',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'33',a:"버버리",r:30,s:1,st:'2026-07-01',en:'2026-07-20',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'34',a:"폴라로이드코리아",r:30,s:1,st:'2026-06-25',en:'2026-07-15',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'35',a:"트렌드뉴스_위클리이슈",r:60,s:0.5,st:'2026-07-08',en:'2026-07-14',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'36',a:"NH투자증권",r:30,s:1,st:'2026-04-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'37',a:"LG전자(정수기)",r:30,s:1,st:'2026-06-08',en:'2027-04-30',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'38',a:"트렌드뉴스_컬쳐(디어에반핸슨)",r:30,s:1,st:'2026-06-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'41',a:"타임폴리오자산운용",r:15,s:0.5,st:'2026-06-15',en:'2026-08-14',c:'상업',n:"2"},
+  {d:'2026-07-10',v:'cmt',no:'43',a:"룩소티카",r:20,s:0.5,st:'2026-05-28',en:'2026-07-27',c:'상업',n:"optical"},
+  {d:'2026-07-10',v:'cmt',no:'44',a:"룩소티카",r:20,s:0.5,st:'2026-05-28',en:'2026-07-27',c:'상업',n:"sun"},
+  {d:'2026-07-10',v:'cmt',no:'45',a:"트렌드뉴스_컬쳐(뱅크시 특별전)",r:30,s:0.5,st:'2026-06-24',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'47',a:"타사키",r:15,s:0.25,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'52',a:"디에스자산운용",r:30,s:1,st:'2026-07-08',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'53',a:"미국피칸협회",r:30,s:0.5,st:'2026-06-12',en:'2026-07-11',c:'상업',n:""},
+  {d:'2026-07-10',v:'cmt',no:'60',a:"서울시_아리수",r:20,s:0.5,st:'2026-06-10',en:'2026-07-10',c:'공익',n:""},
+  {d:'2026-07-10',v:'cmt',no:'SYNC',a:"동시송출 프로그램_7월",r:120,s:0,st:'2026-07-01',en:'2026-07-31',c:'공익',n:"08:26, 12:26, 18:26"},
+  {d:'2026-07-10',v:'pmt',no:'2',a:"헤드라인 뉴스",r:60,s:1,st:'2026-07-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'3',a:"PCD",r:30,s:1,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'6',a:"LG그룹",r:30,s:1,st:'2026-05-01',en:'2027-04-30',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'7',a:"플러스엠 <호프>",r:15,s:1,st:'2026-06-25',en:'2026-07-24',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'8',a:"트렌드뉴스_하이엔드",r:50,s:0.5,st:'2026-07-08',en:'2026-07-14',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'11',a:"트렌드뉴스_컬쳐(헬스키친)",r:30,s:1,st:'2026-06-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'14',a:"그라프",r:15,s:1,st:'2026-07-03',en:'2026-08-02',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'15',a:"케이팝 시즌 콘텐트",r:30,s:1,st:'2026-07-01',en:'2026-07-10',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'17',a:"타사키",r:15,s:1,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'19',a:"LG그룹",r:30,s:1,st:'2026-05-01',en:'2027-04-30',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'24',a:"플러스엠 <호프>",r:15,s:1,st:'2026-06-25',en:'2026-07-24',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'29',a:"텐센트 아린",r:20,s:1,st:'2026-07-07',en:'2026-07-10',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'33',a:"버버리",r:30,s:1,st:'2026-07-01',en:'2026-07-20',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'34',a:"폴라로이드코리아",r:30,s:1,st:'2026-06-25',en:'2026-07-15',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'35',a:"트렌드뉴스_위클리이슈",r:60,s:0.5,st:'2026-07-08',en:'2026-07-14',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'36',a:"NH투자증권",r:30,s:1,st:'2026-04-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'37',a:"LG전자(정수기)",r:30,s:1,st:'2026-06-08',en:'2027-04-30',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'38',a:"트렌드뉴스_컬쳐(디어에반핸슨)",r:30,s:1,st:'2026-06-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'43',a:"룩소티카",r:20,s:0.5,st:'2026-05-28',en:'2026-07-27',c:'상업',n:"optical"},
+  {d:'2026-07-10',v:'pmt',no:'44',a:"룩소티카",r:20,s:0.5,st:'2026-05-28',en:'2026-07-27',c:'상업',n:"sun"},
+  {d:'2026-07-10',v:'pmt',no:'45',a:"트렌드뉴스_컬쳐(뱅크시 특별전)",r:30,s:0.5,st:'2026-06-24',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'47',a:"타사키",r:15,s:0.25,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'50',a:"강남구청_7월 원더케이",r:30,s:0.5,st:'2026-07-08',en:'2026-07-14',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'52',a:"디에스자산운용",r:30,s:1,st:'2026-07-08',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'53',a:"미국피칸협회",r:30,s:0.5,st:'2026-06-12',en:'2026-07-11',c:'상업',n:""},
+  {d:'2026-07-10',v:'pmt',no:'60',a:"서울시_아리수",r:20,s:0.5,st:'2026-06-10',en:'2026-07-10',c:'공익',n:""},
+  {d:'2026-07-10',v:'pmt',no:'SYNC',a:"동시송출 프로그램_7월",r:120,s:0,st:'2026-07-01',en:'2026-07-31',c:'공익',n:"08:26, 12:26, 18:26"},
+  {d:'2026-07-10',v:'amazing',no:'1',a:"미래에셋증권",r:30,s:0.25,st:'2026-03-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'2',a:"폴라로이드코리아",r:30,s:0.25,st:'2026-06-25',en:'2026-07-15',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'3',a:"피아제",r:30,s:0.25,st:'2026-07-01',en:'2026-08-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'4',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"등산"},
+  {d:'2026-07-10',v:'amazing',no:'5',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'6',a:"파르나스몰_에플로어",r:30,s:0.25,st:'2026-02-05',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'7',a:"NH투자증권",r:30,s:0.25,st:'2026-04-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'8',a:"그라프",r:15,s:0.25,st:'2026-07-03',en:'2026-08-02',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'9',a:"디에스자산운용",r:30,s:0.25,st:'2026-07-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'10',a:"BAZAAR(7.5월호)",r:20,s:0.25,st:'2026-07-07',en:'2026-07-20',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'11',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'12',a:"하나은행(퇴직연금)",r:15,s:0.25,st:'2026-07-10',en:'2026-10-09',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'13',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"택배기사"},
+  {d:'2026-07-10',v:'amazing',no:'14',a:"룩소티카",r:20,s:0.25,st:'2026-05-28',en:'2026-07-27',c:'상업',n:"SUN"},
+  {d:'2026-07-10',v:'amazing',no:'15',a:"미국피칸협회",r:30,s:0.25,st:'2026-06-12',en:'2026-07-11',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'16',a:"타사키",r:30,s:0.25,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'17',a:"JTBC <아파트>",r:30,s:0.25,st:'2026-07-03',en:'2026-07-16',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'18',a:"트렌드뉴스_위클리이슈",r:60,s:0.25,st:'2025-12-31',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'19',a:"미래에셋증권",r:30,s:0.25,st:'2026-03-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'20',a:"폴라로이드코리아",r:30,s:0.25,st:'2026-06-25',en:'2026-07-15',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'21',a:"피아제",r:30,s:0.25,st:'2026-07-01',en:'2026-08-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'22',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"등산"},
+  {d:'2026-07-10',v:'amazing',no:'23',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'24',a:"파르나스몰_에플로어",r:30,s:0.25,st:'2026-02-05',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'25',a:"NH투자증권",r:30,s:0.25,st:'2026-04-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'26',a:"그라프",r:15,s:0.25,st:'2026-07-03',en:'2026-08-02',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'27',a:"디에스자산운용",r:30,s:0.25,st:'2026-07-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'28',a:"BAZAAR(7.5월호)",r:20,s:0.25,st:'2026-07-07',en:'2026-07-20',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'29',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'30',a:"하나은행(퇴직연금)",r:15,s:0.25,st:'2026-07-10',en:'2026-10-09',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'31',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"직장인"},
+  {d:'2026-07-10',v:'amazing',no:'32',a:"트렌드뉴스_하이엔드",r:40,s:0.25,st:'2025-12-31',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'33',a:"몰튼스 더 스테이크하우스",r:30,s:0.25,st:'2026-04-02',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'34',a:"현대큐밍",r:30,s:0.25,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'35',a:"트렌드뉴스_컬쳐_뱅크시",r:30,s:0.25,st:'2026-06-24',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'36',a:"미래에셋증권",r:30,s:0.25,st:'2026-03-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'37',a:"폴라로이드코리아",r:30,s:0.25,st:'2026-06-25',en:'2026-07-15',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'38',a:"피아제",r:30,s:0.25,st:'2026-07-01',en:'2026-08-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'39',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"등산"},
+  {d:'2026-07-10',v:'amazing',no:'40',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'41',a:"파르나스몰_에플로어",r:30,s:0.25,st:'2026-02-05',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'42',a:"NH투자증권",r:30,s:0.25,st:'2026-04-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'43',a:"그라프",r:15,s:0.25,st:'2026-07-03',en:'2026-08-02',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'44',a:"디에스자산운용",r:30,s:0.25,st:'2026-07-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'45',a:"BAZAAR(7.5월호)",r:20,s:0.25,st:'2026-07-07',en:'2026-07-20',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'46',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'47',a:"하나은행(퇴직연금)",r:15,s:0.25,st:'2026-07-10',en:'2026-10-09',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'48',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"장마철"},
+  {d:'2026-07-10',v:'amazing',no:'49',a:"룩소티카",r:20,s:0.25,st:'2026-05-28',en:'2026-07-27',c:'상업',n:"OPTICAL"},
+  {d:'2026-07-10',v:'amazing',no:'50',a:"미국피칸협회",r:30,s:0.25,st:'2026-06-12',en:'2026-07-11',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'51',a:"타사키",r:30,s:0.25,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'52',a:"JTBC <아파트>",r:30,s:0.25,st:'2026-07-03',en:'2026-07-16',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'53',a:"트렌드뉴스_위클리이슈",r:60,s:0.25,st:'2025-12-31',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'54',a:"미래에셋증권",r:30,s:0.25,st:'2026-03-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'55',a:"폴라로이드코리아",r:30,s:0.25,st:'2026-06-25',en:'2026-07-15',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'56',a:"피아제",r:30,s:0.25,st:'2026-07-01',en:'2026-08-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'57',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"등산"},
+  {d:'2026-07-10',v:'amazing',no:'58',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'59',a:"파르나스몰_에플로어",r:30,s:0.25,st:'2026-02-05',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'60',a:"NH투자증권",r:30,s:0.25,st:'2026-04-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'61',a:"그라프",r:15,s:0.25,st:'2026-07-03',en:'2026-08-02',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'62',a:"디에스자산운용",r:30,s:0.25,st:'2026-07-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'63',a:"BAZAAR(7.5월호)",r:20,s:0.25,st:'2026-07-07',en:'2026-07-20',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'64',a:"KB자산운용",r:15,s:0.25,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'65',a:"하나은행(퇴직연금)",r:15,s:0.25,st:'2026-07-10',en:'2026-10-09',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'66',a:"링티",r:15,s:0.25,st:'2026-07-10',en:'2026-09-30',c:'상업',n:"등산"},
+  {d:'2026-07-10',v:'amazing',no:'67',a:"트렌드뉴스_하이엔드",r:40,s:0.25,st:'2025-12-31',en:'2026-12-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'68',a:"몰튼스 더 스테이크하우스",r:30,s:0.25,st:'2026-04-02',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'amazing',no:'69',a:"현대큐밍",r:30,s:0.25,st:'2026-07-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'amazing',no:'70',a:"트렌드뉴스_컬쳐_뱅크시",r:30,s:0.25,st:'2026-06-24',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'2',a:"YG플러스",r:20,s:1,st:'2026-01-02',en:'2026-12-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'3',a:"서울시_나의 비밀친구 해치",r:30,s:1,st:'2026-06-09',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'5',a:"미래에셋증권",r:30,s:1,st:'2026-03-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'10',a:"서울시_국제정원박람회",r:20,s:1,st:'2026-03-14',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'20',a:"2027 충청 유니버시아드대회 조직위원회",r:20,s:1,st:'2026-07-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'23',a:"삼성물산(에버랜드)",r:20,s:1,st:'2026-07-03',en:'2026-07-14',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'25',a:"링티",r:30,s:1,st:'2026-06-15',en:'2026-07-14',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'30',a:"대검찰청",r:19,s:1,st:'2026-07-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'31',a:"KB자산운용",r:15,s:1,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'32',a:"뱅크시 전시",r:30,s:0.5,st:'2026-06-30',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'33',a:"서울시_아리수",r:30,s:1,st:'2026-06-09',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'35',a:"베스트슬립",r:30,s:1,st:'2026-05-18',en:'2026-08-17',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'38',a:"국민연금공단",r:30,s:0.5,st:'2026-06-17',en:'2026-07-16',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'40',a:"문화체육관광부",r:20,s:1,st:'2026-07-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'43',a:"삼성물산(에버랜드)",r:20,s:0.5,st:'2026-07-03',en:'2026-07-14',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'45',a:"노크잇",r:30,s:0.5,st:'2026-06-12',en:'2026-07-11',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'48',a:"KB자산운용",r:15,s:1,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'curved',no:'50',a:"문화체육관광부",r:20,s:1,st:'2026-07-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'curved',no:'SYNC',a:"애플",r:1440,s:0,st:'2026-01-01',en:'2026-12-31',c:'상업',n:"매시 0~24분(24분간)"},
+  {d:'2026-07-10',v:'curved',no:'SYNC',a:"노크잇",r:30,s:0,st:'2026-06-12',en:'2026-07-11',c:'상업',n:"매시 26, 56분"},
+  {d:'2026-07-10',v:'t204',no:'5',a:"Wave garden",r:40,s:1,st:'2026-07-01',en:'2026-07-31',c:'건물주',n:""},
+  {d:'2026-07-10',v:'t204',no:'8',a:"타임폴리오자산운용",r:15,s:1,st:'2026-06-15',en:'2026-08-14',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'10',a:"서울시청_내친구서울 서울갤러리",r:30,s:1,st:'2026-03-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'t204',no:'13',a:"뱅크시 전시",r:30,s:0.5,st:'2026-06-30',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'15',a:"FLOW_#4_SUMMER_anamorphic",r:30,s:1,st:'2026-07-01',en:'2026-07-31',c:'건물주',n:""},
+  {d:'2026-07-10',v:'t204',no:'16',a:"KB자산운용",r:15,s:1,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'18',a:"JTBC <아파트>",r:30,s:1,st:'2026-07-05',en:'2026-07-11',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'20',a:"강남구청_자연순환 웰쓰",r:30,s:1,st:'2026-07-03',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'t204',no:'22',a:"하나은행(퇴직연금)",r:15,s:1,st:'2026-07-10',en:'2026-10-09',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'25',a:"Breath on the grid",r:20,s:1,st:'2026-07-01',en:'2026-07-31',c:'건물주',n:""},
+  {d:'2026-07-10',v:'t204',no:'29',a:"국가데이터처",r:20,s:0.5,st:'2026-07-01',en:'2026-07-10',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'30',a:"서울시청_아리수",r:20,s:1,st:'2026-06-12',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'t204',no:'33',a:"NH투자증권",r:30,s:1,st:'2026-04-01',en:'2026-07-31',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'35',a:"Wave garden",r:40,s:1,st:'2026-07-01',en:'2026-07-31',c:'건물주',n:""},
+  {d:'2026-07-10',v:'t204',no:'38',a:"타임폴리오자산운용",r:15,s:1,st:'2026-06-15',en:'2026-08-14',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'40',a:"강남구청_행복 일자리 박람회",r:30,s:1,st:'2026-07-03',en:'2026-07-15',c:'공익',n:""},
+  {d:'2026-07-10',v:'t204',no:'41',a:"미래에셋증권",r:30,s:1,st:'2026-03-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'45',a:"Wave garden",r:40,s:1,st:'2026-07-01',en:'2026-07-31',c:'건물주',n:""},
+  {d:'2026-07-10',v:'t204',no:'48',a:"디에스자산운용",r:30,s:1,st:'2026-07-06',en:'2026-08-05',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'50',a:"서울시청_내친구서울 서울갤러리",r:30,s:1,st:'2026-03-01',en:'2026-07-31',c:'공익',n:""},
+  {d:'2026-07-10',v:'t204',no:'51',a:"국민연금공단",r:30,s:0.5,st:'2026-06-17',en:'2026-07-16',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'53',a:"미국피칸협회",r:30,s:0.5,st:'2026-06-12',en:'2026-07-11',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'54',a:"KB자산운용",r:15,s:1,st:'2026-07-08',en:'2026-08-07',c:'상업',n:""},
+  {d:'2026-07-10',v:'t204',no:'55',a:"Breath on the grid",r:20,s:1,st:'2026-07-01',en:'2026-07-31',c:'건물주',n:""}
+];
+
+/* 매체소개서 파일 (드라이브 폴더) */
+const docs = [
+  {id:'1-FSHm5E8dg2jEqO4EWeGpzDUyYSSpFyI',name:"(260615) 중앙일보_ 비즈솔루션본부 소개서.pdf",ext:'pdf',size:133900939,updated:'2026-06-15'},
+  {id:'1gbPG1TMcMj_bUvcXNnki2VQqcrKdDxWU',name:"(260615) 중앙일보 2026 OOH 상품 소개서.pptx",ext:'pptx',size:75526143,updated:'2026-06-15'},
+  {id:'1FUIJ05jnQHN76xDvMh70NZiKrd59AcZN',name:"(260615) The JoongAng OOH Introduction.pdf",ext:'pdf',size:35800107,updated:'2026-06-15'},
+  {id:'1S-u31L8dwMB2pxeYT5U_-cUrOtrMVVRe',name:"(260615) The JoongAng OOH Introduction.pptx",ext:'pptx',size:116373844,updated:'2026-06-15'},
+  {id:'1zChJ_9n50bc3umijgfUiHhqFH4Y5Duuv',name:"260611_타운보드 Media kit.pdf",ext:'pdf',size:28403330,updated:'2026-06-15'},
+  {id:'1s1o5_vghmoJb_W4EHjMWdNXs58S0wAwj',name:"260611_타운보드 Media kit.pptx",ext:'pptx',size:128760616,updated:'2026-06-14'},
+  {id:'1O1QAUwvl49AGIR-1K6fLVR6EI7JTChEA',name:"260611_2026 타운보드 광고영업정책서.pdf",ext:'pdf',size:652216,updated:'2026-06-14'},
+  {id:'1iPAS1UkFwdDgOSjR0DlKzuD7UBll0Qth',name:"260611_2026 타운보드 광고영업정책서.pptx",ext:'pptx',size:8080965,updated:'2026-06-14'}
+];
+/* 게첨자료 — 캠페인 폴더 (게첨일_광고주_매체) */
+let assets = [
+  {id:'1j0F5fNos07PmvB09RRIUF-LMH0DBs5Tz',name:"260601_올리브영_AP"},
+  {id:'1hDa-1rDcQrPxrol-G3HeASJMTK4yE8WK',name:"260601_우리카드_AP"},
+  {id:'1Fm4nNxmDFYEFUY0GSIOUSfBfm9x3ahAx',name:"260601_발렌티노_CPMT"},
+  {id:'17ygB_8_xPQJMv_M4EiEKSrq6ypOp4F47',name:"260601_페이버릿 글로벌OTT어워즈_PMT"},
+  {id:'1ioTtpnQf2tuVuTMZXK2AZ0aZ8KUdiby_',name:"260601_트렌드뉴스 위클리이슈(마리떼)_CPMT_AP"},
+  {id:'1P5tbJF3HsIFxkm8B5UKhy2H6GnFtZjmv',name:"260601_컬쳐트렌드뉴스(겨울왕국)_CPMT"},
+  {id:'1crH-LsI0IVxvGGCFyhQdQrtvh07PwpD8',name:"260601_하루틴_CPMT_AP_T204"},
+  {id:'1JyR5igvbnuVVmO970gwXTumL9cvlBfVv',name:"260601_서울시선거관리위원회_CPMT_AP_홍대_T204"},
+  {id:'1kpsLtomWyCSxxyowN3EZHmH6iMSRm40f',name:"260601_프라다 아이웨어_홍대 SYNC"},
+  {id:'1VMx3-GTc9vm9DZI4vtDXNNJ85V13W3fJ',name:"260601_예거르쿨트르_T204"},
+  {id:'1Wwhxh9Ju-_TZFLSIQocaPqHXDYqyKeEC',name:"260601_링티 오리지널_AP"},
+  {id:'1V078aR7CxiZqGCkEUQ4EUTI02fN5OKUJ',name:"260601_삼성자산운용_T204"},
+  {id:'17whsPgExy__GDly9wPOwNOX1v06E68Cn',name:"260601_워너브라더스(슈퍼걸)_CPMT"},
+  {id:'1Df_831Q3fC8CVzgfW0nEhk74kJe-GTQJ',name:"260601_애플_홍대"},
+  {id:'1fCYWJ7h90yTnPUqlnDk7zTqrHOMRTdjI',name:"260601_헬리녹스_AP"},
+  {id:'1AyorDpTWdyfJ5fY2agyQ8n0uuJRQ7CEr',name:"260601_미래에셋증권_AP_T204_홍대"},
+  {id:'1Cx6GPIXt2wolaDMFuR84OPPHf99PvqWt',name:"260601_NH투자증권_CPMT_AP_T204"},
+  {id:'1moHqCSb6O6K3WHyIFd5B8EoKhyrAyAkx',name:"260601_토코보_홍대"},
+  {id:'1LsIc28uMSoSDKTdSaDiJrcs61g7JxI1F',name:"260601_버버리_CPMT"},
+  {id:'1ptfZsibEXcRehUJd2Z9ZjFFvxxfqjBzG',name:"260601_JTBC<신입사원 강회장>_AP"},
+  {id:'1Ontay0OGKXiG0X80DseDHo7JBYq3MRLR',name:"260601_컬쳐트렌드뉴스(헬스키친)_CPMT"},
+  {id:'1e8Z-bexAZ8B9OS_XaYchas7szGC1luYy',name:"260601_YG플러스_홍대"},
+  {id:'1Y3ZUXiHjrgq-gd5UXOcGvkOSM3qJjBYz',name:"260601_품고_T204"},
+  {id:'1dKq09ka1ZyjkKtMcaJb_Ww_t2C5qwCKv',name:"260601_헥토헬스케어_PMT"},
+  {id:'1-hP9kfgFHFC0SHcYhZ4w4q4J50nE-1XQ',name:"260601_스포티비_홍대"},
+  {id:'16ECHaipuuVWuiJY4wKHgPLvdedgWUOc4',name:"260601_링티 나잇티_AP"},
+  {id:'14fd-tw2vRMFXgEETWyJAtLGG7t7fz4i6',name:"260601_마이브라운(펫보험)_T204_홍대"},
+  {id:'1KTPf8asTbomYOGfCFhOm0yQk1lagBxx4',name:"260601_브레게_CPMT"},
+  {id:'1W8y4HC-QLUjsabhQtm7C07tligAP-3Jo',name:"260601_KB자산운용_AP_T204_홍대"},
+  {id:'1ZbX-wZNWFK5yMGAIy-EKFf26BEGgMfFw',name:"260601_베스트슬립_홍대"},
+  {id:'1c8Rx8TwgBQYLrG7Em1PCj8MZxzIiPZqs',name:"260601_컬쳐트렌드뉴스(디어에반핸슨)_CPMT"},
+  {id:'1g5RYaQS1-z4Aq-TjDfqb8ThKmFtwEZJx',name:"260601_LG그룹_CPMT"},
+  {id:'1cj-Fv51Rbqx2tHc-v1wO7bsAeIpLyaXE',name:"260601_디아지오코리아_CPMT_AP"},
+  {id:'1X6are88yzFPqAsGtMiYnkNU9WwE12IxB',name:"260601_런드리유_CPMT_AP_T204"},
+  {id:'13_h6ZGM1CE3GIVzczrSJXi-VyOG73L63',name:"260601_레노버_CPMT_AP"},
+  {id:'1pBHHdD9I2NWrkbS4OfenZmvcrX7Wf11Q',name:"260601_게스_홍대"},
+  {id:'1QfMIy8GrTpgjqypwBVAoSnIxJ_HH924x',name:"260601_리모와_AP"},
+  {id:'1FeLm1X7zX0eppz-HLLPqTMgBywgOXa8h',name:"260601_룩소티카_CPMT_AP"},
+  {id:'1PKIHzungUGaO81dPnbBBr0Kxq3QGeen-',name:"260601_국가데이터처 경제총조사_홍대 SYNC"},
+  {id:'1K7qf90-l6J9OqjPghYNsINT1d0JccTD2',name:"260601_론진_T204"},
+  {id:'1XnkLhxAdZ6zkKljpLY4RahavZPxEpXw1',name:"260601_도미노피자_T204"},
+  {id:'14jWTJvApUR-1zSbEyEQEYDfsKFKmA5C5',name:"260601_르무통_AP"},
+  {id:'1hx5Ff-kbwHXTQ32F-5ZwXFkHzlLvPTIT',name:"260504_BHC_CPMT_AP"},
+  {id:'1PcxLcB2kPk-P-L5hF-MS6NauEzeMKPXf',name:"260504_YG플러스_홍대"},
+  {id:'10NI5KCt3cn7rguc5bpmOxKhbrR26JdC3',name:"260504_BAZAAR_AP"},
+  {id:'1yxlh23I6pVAWvckfazQx4W12MkTdJ0Eu',name:"260504_LF헤지스_PMT"},
+  {id:'1WCrr2FdTquBwc3VsHShX1lcKTQDpoTta',name:"260504_NH투자증권_CPMT_AP_T204"},
+  {id:'1ozRGcRv_Tlm4Ef6pqxyi6E9hGBWBQ1lh',name:"260504_LG그룹_CPMT"},
+  {id:'1av5VC7rT4W1JkVU4EC6TgGeZ6Qpq_RRJ',name:"260504_SK매직_CPMT"},
+  {id:'1nyCKkQJZI7xRE_La9AAjyz1yTOLTVfr6',name:"260504_트렌드뉴스 하이엔드(록시땅)_CPMT_AP"},
+  {id:'1kmzVJ_EbSj0xiEydXn7ZgLTwIPDMY_W9',name:"260504_커버낫_AP_홍대"},
+  {id:'1FEBqdb73ngzS_xdAQ7aGuG96MGjJG4BO',name:"260504_한국도박문제예방치유원_CMT"},
+  {id:'1lcuJ3soovVYiyHhsEDg7l42Hcd4c1Bfn',name:"260504_요리를배워요_CPMT_AP_홍대_T204"},
+  {id:'1LkoVMsFOc6OLG9oME2lLkgd4drla9V3p',name:"260504_하루틴_CPMT_AP_T204"},
+  {id:'1LIQUBMNLQbTxUHivkyfEEz6511XXE0mF',name:"260504_서울관광협회_홍대"},
+  {id:'1rojaHlZNvIX3EFDycuVUO_viVFF4J8C2',name:"260504_와일드터키_CPMT_AP"},
+  {id:'1COalJ1MtxNgl5MKjUsg5q-V--jJxdRqU',name:"260504_슬랙_CMT"},
+  {id:'1w23yKbXTp52LlpXFv71RurULe9XBgutJ',name:"260504_삼쩜삼_PMT_AP_T204"},
+  {id:'1T3y9gg50A3nVIr68Vk1Tg6wdXP9ZNeIg',name:"260504_스포티비_PMT"},
+  {id:'1lPz1-hQHMTBhgL-pP8YoO3QOHNzWwl8Y',name:"260504_애플_홍대"}
+];
+
+/* 폴더명 파싱: 260601_하루틴_CPMT_AP_T204 → 날짜/광고주/매체 */
+const MEDIA_TOKENS = { 'CPMT':['CMT','PMT'], 'CMT':['CMT'], 'PMT':['PMT'],
+  'AP':['AP'], 'T204':['T204'], '홍대':['CW'], '홍대 SYNC':['CW'] };
+const MEDIA_ORDER = ['CMT','PMT','AP','CW','T204'];
+function parseAsset(name){
+  const t = String(name).split('_');
+  let date = null;
+  const m = (t[0]||'').match(/^(\d{2})(\d{2})(\d{2})$/);
+  if(m){ date = '20'+m[1]+'-'+m[2]+'-'+m[3]; t.shift(); }
+  const media = [];
+  while(t.length > 1){
+    const last = t[t.length-1].trim();
+    const key = Object.keys(MEDIA_TOKENS).find(k=>k.toUpperCase()===last.toUpperCase());
+    if(!key) break;
+    MEDIA_TOKENS[key].forEach(x=>{ if(!media.includes(x)) media.push(x); });
+    t.pop();
+  }
+  media.sort((a,b)=>MEDIA_ORDER.indexOf(a)-MEDIA_ORDER.indexOf(b));
+  return { date, adv: t.join('_').trim() || name, media, sync: /SYNC/i.test(name) };
+}
+
+/* ---------- 업종 분류 ----------
+   광고주명 키워드로 업종을 추정합니다. 위에서부터 먼저 맞는 규칙을 씁니다.
+   스프레드시트에 '업종매핑' 탭(advertiser | industry)이 있으면 그 값이 우선합니다. */
+const INDUSTRY_RULES = [
+  ['공공·공익',        ['서울시','강남구','국가데이터처','대검찰청','문화체육관광부','선거관리위원회','국민연금','도박문제','관광협회','유니버시아드','아리수','경제총조사','일자리','공단','협회']],
+  ['자사 콘텐트',      ['트렌드뉴스','컬쳐트렌드','헤드라인','PCD','케이팝','동시송출','시즌 콘텐트','파르나스몰','위클리이슈','하이엔드']],
+  ['미디어·엔터',      ['JTBC','워너브라더스','플러스엠','OTT','스포티비','YG','넷플릭스','뱅크시','전시','BAZAAR','어워즈','시즌']],
+  ['금융',            ['은행','카드','증권','자산운용','보험','금융','토스','삼쩜삼','미래에셋','KB','NH','신한','하나','타임폴리오','디에스','연금']],
+  ['명품·주얼리·시계', ['발렌티노','버버리','브레게','예거르쿨트르','론진','그라프','타사키','리모와','룩소티카','피아제','디올','샤넬','프라다','르무통']],
+  ['스포츠·레저',      ['헬리녹스','에버랜드','나이키','아디다스','골프']],
+  ['패션·뷰티',        ['게스','커버낫','헤지스','무신사','올리브영','토코보','아이웨어','록시땅','마리떼']],
+  ['전자·IT',         ['애플','LG','삼성전자','레노버','SK매직','슬랙','현대큐밍','폴라로이드','텐센트','카카오']],
+  ['식음료',          ['도미노','BHC','링티','하루틴','피칸','와일드터키','디아지오','몰튼스','요리를배워요','피자','커피']],
+  ['생활·서비스',      ['베스트슬립','런드리유','노크잇','품고','마이브라운','헥토헬스케어','정수기','펫']],
+];
+let industryMap = {};   /* '업종매핑' 탭에서 온 수동 지정 (광고주 → 업종) */
+
+function classifyIndustry(adv){
+  const s = String(adv||'');
+  if(industryMap[s]) return industryMap[s];
+  const up = s.toUpperCase();
+  for(const [ind, kws] of INDUSTRY_RULES){
+    if(kws.some(k=>up.includes(k.toUpperCase()))) return ind;
+  }
+  return '미분류';
+}
+const INDUSTRY_COLOR = {
+  '공공·공익':'#7A8699', '자사 콘텐트':'#8A94A6', '미디어·엔터':'#7C5CBF',
+  '금융':'#1F6FB2', '명품·주얼리·시계':'#B8862B', '스포츠·레저':'#1F9D6B',
+  '패션·뷰티':'#C2557A', '전자·IT':'#2A7F7F', '식음료':'#D98A2B',
+  '생활·서비스':'#5A6678', '미분류':'#B9C2CE',
+};
+
+const CAT_COLOR = { '상업':'var(--paid)', '공익':'var(--svc)', '건물주':'var(--own)' };
+
+/* ---------- 유틸 ---------- */
+const fmtD    = s => { const d=new Date(s); return `${d.getMonth()+1}/${d.getDate()}`; };
+const fmtFull = s => { const d=new Date(s); return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`; };
+const today0  = () => { const t=new Date(); t.setHours(0,0,0,0); return t; };
+const esc     = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const mb      = n => n >= 1048576 ? (n/1048576).toFixed(1)+'MB' : Math.max(1,Math.round(n/1024))+'KB';
+const r2      = n => Math.round(n*100)/100;
+
+function latestDate(vid){
+  const ds = sched.filter(b=>b.v===vid).map(b=>b.d).sort();
+  return ds.length ? ds[ds.length-1] : null;
+}
+function datesOf(vid){
+  return [...new Set(sched.filter(b=>b.v===vid).map(b=>b.d))].sort().reverse();
+}
+/** 구좌 집계: 유가(상업) / 서비스(공익+건물주) */
+function slotStats(vid, date){
+  const d = date || latestDate(vid);
+  const it = sched.filter(b=>b.v===vid && b.d===d);
+  const paid = r2(it.filter(b=>b.c==='상업').reduce((s,b)=>s+b.s,0));
+  const svc  = r2(it.filter(b=>b.c!=='상업').reduce((s,b)=>s+b.s,0));
+  const total = r2(paid+svc);
+  return { items:it, paid, svc, total, pct: total ? Math.round(paid/total*100) : 0 };
+}
+
+/* ---------- 데이터 로드 ---------- */
+async function loadData(){
+  if(!APPS_SCRIPT_URL) return;
+  try{
+    const res = await fetch(APPS_SCRIPT_URL);
+    const json = await res.json();
+    if(json.bookings && json.bookings.length){
+      sched.length = 0;
+      json.bookings.forEach(b=>sched.push({
+        d:b.date, v:String(b.venue), no:String(b.no||''), a:b.advertiser, r:Number(b.runtime)||0,
+        s:Number(b.slots)||0, st:b.start, en:b.end,
+        c:String(b.category||'상업').trim(), n:b.note||''
+      }));
+      schedDate = null;
+      dataSource = 'live';
+    }
+    // 빈 배열([])은 JS 에서 참이므로 length 로 판단해야 합니다.
+    // 서버가 빈 목록을 주면 예시 데이터를 유지하고 에러를 표시합니다.
+    if(Array.isArray(json.docs) && json.docs.length){ docs.length = 0; json.docs.forEach(f=>docs.push(f)); }
+    if(Array.isArray(json.assets) && json.assets.length){ assets = json.assets; }
+
+    if(Array.isArray(json.industries)){
+      industryMap = {};
+      json.industries.forEach(r=>{ if(r.advertiser && r.industry) industryMap[r.advertiser] = r.industry; });
+    }
+    if(json.errors){ loadErrors = json.errors; }
+    if(json.error){ loadErrors.top = json.error; }
+  }catch(err){
+    console.warn('데이터 로드 실패 — 예시 데이터로 표시합니다.', err);
+    loadErrors.top = String(err && err.message || err);
+    dataSource = 'demo';
+  }
+}
+
+/* ============ 편성표 ============ */
+let schedVenue = 'cmt';
+let schedDate  = null;
+
+function renderSched(){
+  const v = venues.find(x=>x.id===schedVenue) || venues[0];
+  const dates = datesOf(v.id);
+  if(!dates.includes(schedDate)) schedDate = dates[0] || null;
+
+  document.getElementById('schedChips').innerHTML = venues.map(x=>
+    `<button class="tab${x.id===schedVenue?' on':''}" onclick="pickSchedVenue('${x.id}')">${x.short}</button>`).join('');
+
+  document.getElementById('dateChips').innerHTML = dates.length
+    ? dates.map(d=>`<button class="tab sm${d===schedDate?' on':''}" onclick="pickSchedDate('${d}')">${fmtD(d)}</button>`).join('')
+    : '<span class="tab-empty">편성 데이터 없음</span>';
+
+  const st = slotStats(v.id, schedDate);
+  document.getElementById('schedStats').innerHTML = `
+    <div class="stat"><div class="num">${st.items.length}</div><div class="lab">편성 광고주</div></div>
+    <div class="stat"><div class="num">${st.total}</div><div class="lab">총 구좌</div></div>
+    <div class="stat"><div class="num">${st.pct}<small>%</small></div><div class="lab">유가 점유율</div></div>`;
+
+  const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
+  document.getElementById('schedMeta').innerHTML =
+    `${v.name} · 운영 ${v.hours}${schedDate?' · '+fmtFull(schedDate)+' 기준':''} ${tag}`;
+
+  renderTable(st.items);
+}
+
+function renderTable(items){
+  const t = today0();
+  const noKey = b => b.no==='SYNC' ? 9999 : (parseInt(b.no,10) || 9999);
+  const rows = items.slice().sort((a,b)=> noKey(a)-noKey(b));   // 원본 No. 순서
+
+  document.getElementById('advBody').innerHTML = rows.map(b=>{
+    const gi = sched.indexOf(b);
+    const left = Math.round((new Date(b.en) - t)/864e5);
+    const endCell = left < 0 ? `<span class="d-gone">${fmtD(b.en)}</span>`
+      : left <= 14 ? `<span class="d-soon">${b.en.slice(5).replace('-','/')} · ${left===0?'오늘':'D-'+left}</span>`
+      : `<span class="d-far">${b.en}</span>`;
+    const isNew = b.st === b.d;   // 기준일에 시작 = 신규 편성
+    return `<tr class="${b.c==='상업'?'':'r-svc'}" onclick="openBooking(${gi})">
+      <td class="td-no">${b.no==='SYNC'?'<span class="sync">SYNC</span>':esc(b.no)}</td>
+      <td class="td-adv"><span class="dot" style="background:${CAT_COLOR[b.c]||'var(--ink)'}"></span>
+        <span class="adv-name">${esc(b.a)}</span>
+        ${isNew?'<span class="new-tag">NEW</span>':''}
+        <span class="adv-sub">${b.s?b.s+'구좌':'—'} · ${b.r}s${b.n?' · '+esc(b.n):''}</span></td>
+      <td class="td-num col-run">${b.r}</td>
+      <td class="td-num">${b.s?b.s:'—'}</td>
+      <td class="td-date col-date">${b.st}</td>
+      <td class="td-date">${endCell}</td>
+      <td class="td-cat col-cat"><span class="cat-pill" style="color:${CAT_COLOR[b.c]}">${b.c}</span></td>
+      <td class="td-note col-note">${esc(b.n||'')}</td></tr>`;
+  }).join('');
+}
+function pickSchedVenue(id){ schedVenue=id; renderSched(); }
+function pickSchedDate(d){ schedDate=d; renderSched(); }
+
+function openBooking(i){
+  const b = sched[i];
+  const v = venues.find(x=>x.id===b.v) || {name:b.v};
+  const days = Math.round((new Date(b.en)-new Date(b.st))/864e5)+1;
+  const left = Math.round((new Date(b.en)-today0())/864e5);
+  const status = left<0 ? '종료' : left===0 ? '오늘 종료' : 'D-'+left;
+  showSheet(`
+    <h3><span class="dot lg" style="background:${CAT_COLOR[b.c]}"></span>${esc(b.a)}</h3>
+    <div class="s-type">${v.name} · ${b.c}</div>
+    <div class="period">
+      <div class="p-side"><div class="p-k">시작</div><div class="p-v">${fmtFull(b.st)}</div></div>
+      <div class="p-mid"><div class="p-days">${days}일</div><div class="p-bar"></div>
+        <div class="p-left ${left<=14&&left>=0?'soon':''}">${status}</div></div>
+      <div class="p-side r"><div class="p-k">종료</div><div class="p-v">${fmtFull(b.en)}</div></div>
+    </div>
+    <div class="spec-grid">
+      <div class="spec"><div class="k">구좌</div><div class="v">${b.s?b.s+'구좌':'SYNC 편성'}</div></div>
+      <div class="spec"><div class="k">러닝타임</div><div class="v">${b.r}초</div></div>
+      <div class="spec"><div class="k">구분</div><div class="v" style="color:${CAT_COLOR[b.c]}">${b.c}</div></div>
+      <div class="spec"><div class="k">No.</div><div class="v">${esc(b.no||'-')}</div></div>
+      <div class="spec"><div class="k">편성 기준일</div><div class="v">${fmtFull(b.d)}</div></div>
+      ${b.n?`<div class="spec full"><div class="k">비고</div><div class="v">${esc(b.n)}</div></div>`:''}
+    </div>
+    <div class="sheet-actions"><button class="sa primary" onclick="closeSheet()">닫기</button></div>`);
+}
+
+/* ============ 매체현황 (도넛 대시보드) ============ */
+function renderMedia(){
+  const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
+  document.getElementById('mediaMeta').innerHTML = `매체별 구좌 점유 현황 ${tag}`;
+
+  document.getElementById('mediaGrid').innerHTML = venues.map(v=>{
+    const st = slotStats(v.id);
+    const cls = st.pct>=70 ? 'ok' : st.pct>=40 ? 'warn' : 'danger';
+    const txt = st.pct>=70 ? '양호' : st.pct>=40 ? '주의' : '부족';
+    const deg = st.pct*3.6;
+    return `<div class="media-card" onclick="openVenue('${v.id}')">
+      <div class="mc-top">
+        <div><div class="mc-name">${v.short} · ${v.name}</div><div class="mc-type">${v.type} · ${v.loc}</div></div>
+        <span class="badge ${cls}">${txt}</span>
+      </div>
+      <div class="mc-body">
+        <div class="donut" style="background:conic-gradient(var(--paid) 0deg ${deg}deg, var(--svc) ${deg}deg 360deg)">
+          <div class="donut-center"><div class="donut-pct">${st.pct}%</div><div class="donut-lab">유가 점유율</div></div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-left"><span class="legend-dot" style="background:var(--paid)"></span>유가(상업)</span><span class="legend-val">${st.paid}구좌</span></div>
+          <div class="legend-item"><span class="legend-left"><span class="legend-dot" style="background:var(--svc)"></span>서비스(공익·건물주)</span><span class="legend-val">${st.svc}구좌</span></div>
+          <div class="legend-item"><span class="legend-left"><span class="legend-dot" style="background:#E4E7EC;border:1px solid var(--line)"></span>총 구좌</span><span class="legend-val">${st.total}구좌</span></div>
+        </div>
+      </div>
+      <span class="click-hint">광고주 보기 →</span>
+    </div>`;
+  }).join('');
+}
+
+function openVenue(vid){
+  const v = venues.find(x=>x.id===vid);
+  const st = slotStats(vid);
+  // 패널에서는 같은 광고주를 합쳐 보여줍니다 (구좌 합계)
+  const roll = list => {
+    const m = {};
+    list.forEach(b=>{ if(!m[b.a]) m[b.a]={a:b.a,s:0,r:b.r,n:0}; m[b.a].s+=b.s; m[b.a].n++; });
+    return Object.values(m).map(x=>({...x,s:r2(x.s)})).sort((a,b)=>b.s-a.s || a.a.localeCompare(b.a));
+  };
+  const paid = roll(st.items.filter(b=>b.c==='상업'));
+  const svc  = roll(st.items.filter(b=>b.c!=='상업'));
+  const row = b => `<div class="padv"><span class="pa-n">${esc(b.a)}${b.n>1?`<span class="pa-x">×${b.n}</span>`:''}</span><span class="pa-s">${b.s?b.s+'구좌':'SYNC'} · ${b.r}s</span></div>`;
+  showSheet(`
+    <h3>${v.short} · ${v.name}</h3>
+    <div class="s-type">${v.type} · ${v.loc} · ${latestDate(vid)?fmtFull(latestDate(vid))+' 기준':''}</div>
+    <div class="spec-grid">
+      <div class="spec"><div class="k">유가 점유율</div><div class="v">${st.pct}%</div></div>
+      <div class="spec"><div class="k">총 구좌</div><div class="v">${st.total}구좌</div></div>
+      <div class="spec"><div class="k">유가</div><div class="v">${st.paid}구좌</div></div>
+      <div class="spec"><div class="k">서비스</div><div class="v">${st.svc}구좌</div></div>
+      <div class="spec full"><div class="k">운영</div><div class="v">${v.hours} · ${v.cycle}</div></div>
+    </div>
+    <div class="sect-label">유가 광고주 · ${paid.length}개</div>
+    ${paid.map(row).join('') || '<div class="empty">없음</div>'}
+    <div class="sect-label">서비스 (공익·건물주) · ${svc.length}개</div>
+    ${svc.map(row).join('') || '<div class="empty">없음</div>'}
+    <div class="sheet-actions" style="margin-top:18px">
+      <button class="sa ghost" onclick="closeSheet()">닫기</button>
+      <button class="sa primary" onclick="jumpSched('${vid}')">편성표 보기</button>
+    </div>`);
+}
+function jumpSched(id){ closeSheet(); pickSchedVenue(id);
+  document.querySelector('.nav button[data-v="v-sched"]').click(); }
+
+/* ============ 문서 (매체소개서 / 게첨자료) ============ */
+function fileCard(f){
+  const ext = (f.ext||'other').toLowerCase();
+  const cls = ['pdf','pptx','ppt','xlsx','xls'].includes(ext) ? ext : 'other';
+  const view = f.view || `https://drive.google.com/file/d/${f.id}/view`;
+  const dl   = f.download || `https://drive.google.com/uc?export=download&id=${f.id}`;
+  return `<div class="doc">
+    <div class="ficon ${cls}">${ext.toUpperCase().slice(0,4)}</div>
+    <div class="dmeta">
+      <div class="dname">${esc(f.name)}</div>
+      <div class="dsub">${mb(f.size)}${f.updated?' · '+f.updated:''}</div>
+    </div>
+    <div class="dacts">
+      <a class="dbtn" href="${view}" target="_blank" rel="noopener">보기</a>
+      <a class="dbtn dl" href="${dl}" target="_blank" rel="noopener">받기</a>
+    </div>
+  </div>`;
+}
+function filterFiles(list, q){
+  q = (q||'').trim().toLowerCase();
+  return q ? list.filter(f=>f.name.toLowerCase().includes(q)) : list;
+}
+function renderDocs(){
+  const q = (document.getElementById('docSearch')||{}).value;
+  const list = filterFiles(docs, q);
+  document.getElementById('docGrid').innerHTML = list.length
+    ? list.map(fileCard).join('')
+    : '<div class="empty">검색 결과가 없습니다.</div>';
+}
+let assetMedia = 'ALL';
+let assetInd   = 'ALL';
+let assetGroup = 'date';   // 'date' | 'industry'
+
+function setAssetGroup(g){ assetGroup = g;
+  document.getElementById('segDate').classList[g==='date'?'add':'remove']('on');
+  document.getElementById('segInd').classList[g==='industry'?'add':'remove']('on');
+  renderAssets();
+}
+function pickAssetMedia(m){ assetMedia = m; renderAssets(); }
+function pickAssetInd(i){ assetInd = i; renderAssets(); }
+
+function renderAssets(){
+  const q = ((document.getElementById('assetSearch')||{}).value||'').trim().toLowerCase();
+  const notice = document.getElementById('assetNotice');
+
+  if(!assets.length){
+    notice.innerHTML = `<div class="notice"><b>게첨자료를 불러오지 못했습니다.</b><br>
+      ${loadErrors.assets ? esc(loadErrors.assets) : 'Config.gs 의 ASSET_FOLDER_ID 를 확인하세요.'}<br>
+      <span style="opacity:.8">진단: Apps Script URL 뒤에 <b>?action=diag</b> 를 붙여 브라우저로 열어보세요.</span></div>`;
+    document.getElementById('assetGrid').innerHTML = '<div class="empty">표시할 자료가 없습니다.</div>';
+    return;
+  }
+  notice.innerHTML = loadErrors.assets
+    ? `<div class="notice"><b>주의 ·</b> 실데이터 로드 실패로 예시 목록을 표시 중입니다. ${esc(loadErrors.assets)}</div>` : '';
+
+  const parsed = assets.map(a=>{
+    const p = parseAsset(a.name);
+    return Object.assign({}, a, p, { ind: classifyIndustry(p.adv) });
+  });
+
+  // 매체 칩
+  const bar = document.getElementById('assetFilter');
+  bar.innerHTML = ['ALL'].concat(MEDIA_ORDER).map(mv=>{
+    const n = mv==='ALL' ? parsed.length : parsed.filter(a=>a.media.includes(mv)).length;
+    return `<button class="chip${mv===assetMedia?' on':''}" onclick="pickAssetMedia('${mv}')">${mv==='ALL'?'전체':mv}<span class="cn">${n}</span></button>`;
+  }).join('');
+
+  // 업종 칩 (건수 많은 순)
+  const indCount = {};
+  parsed.forEach(a=>{ indCount[a.ind] = (indCount[a.ind]||0)+1; });
+  const inds = Object.keys(indCount).sort((a,b)=>indCount[b]-indCount[a]);
+  const ibar = document.getElementById('industryFilter');
+  ibar.innerHTML = `<button class="chip${assetInd==='ALL'?' on':''}" onclick="pickAssetInd('ALL')">전체<span class="cn">${parsed.length}</span></button>` +
+    inds.map(i=>`<button class="chip${i===assetInd?' on':''}" onclick="pickAssetInd('${i}')">
+      <span class="idot" style="background:${INDUSTRY_COLOR[i]||'#B9C2CE'}"></span>${i}<span class="cn">${indCount[i]}</span></button>`).join('');
+
+  let list = parsed;
+  if(assetMedia !== 'ALL') list = list.filter(a=>a.media.includes(assetMedia));
+  if(assetInd   !== 'ALL') list = list.filter(a=>a.ind === assetInd);
+  if(q) list = list.filter(a=>a.adv.toLowerCase().includes(q) || a.ind.toLowerCase().includes(q) || a.name.toLowerCase().includes(q));
+
+  document.getElementById('assetCount').textContent = `${list.length}건`;
+
+  if(!list.length){
+    document.getElementById('assetGrid').innerHTML = '<div class="empty">조건에 맞는 자료가 없습니다.</div>';
+    return;
+  }
+
+  // 그룹핑
+  const groups = {};
+  list.forEach(a=>{
+    const k = assetGroup==='industry' ? a.ind : (a.date || '기타');
+    (groups[k] = groups[k] || []).push(a);
+  });
+  const keys = assetGroup==='industry'
+    ? Object.keys(groups).sort((a,b)=>groups[b].length-groups[a].length)
+    : Object.keys(groups).sort().reverse();
+
+  const card = a => `
+    <div class="asset" onclick="openAsset('${a.id}')">
+      <div class="ameta">
+        <div class="aname">${esc(a.adv)}${a.sync?'<span class="sync-tag">SYNC</span>':''}</div>
+        <div class="atags">
+          <span class="itag" style="color:${INDUSTRY_COLOR[a.ind]||'#8A94A6'};border-color:currentColor">${a.ind}</span>
+          ${a.media.map(m=>`<span class="mtag">${m}</span>`).join('')}
+          ${assetGroup==='industry' && a.date ? `<span class="mtag dt">${fmtD(a.date)}</span>` : ''}
+        </div>
+      </div>
+      <span class="arrow">›</span>
+    </div>`;
+
+  document.getElementById('assetGrid').innerHTML = keys.map(k=>{
+    const head = assetGroup==='industry'
+      ? `<span class="idot" style="background:${INDUSTRY_COLOR[k]||'#B9C2CE'}"></span>${k}`
+      : (k==='기타' ? '날짜 미상' : fmtFull(k)+' 게첨');
+    return `<div class="grp-head">${head} <span class="grp-n">${groups[k].length}</span></div>
+      ${groups[k].map(card).join('')}`;
+  }).join('');
+}
+
+/** 캠페인 폴더 클릭 → 그 안의 파일 목록을 불러와 다운로드 링크 표시 */
+async function openAsset(id){
+  const a = assets.find(x=>x.id===id);
+  const p = parseAsset(a.name);
+  const folderUrl = a.view || `https://drive.google.com/drive/folders/${id}`;
+  const head = `
+    <h3>${esc(p.adv)}</h3>
+    <div class="s-type">${p.date?fmtFull(p.date)+' 게첨 · ':''}${p.media.join(' · ')}${p.sync?' · SYNC':''}
+      · <span style="color:${INDUSTRY_COLOR[classifyIndustry(p.adv)]||'#8A94A6'};font-weight:700">${classifyIndustry(p.adv)}</span></div>`;
+
+  showSheet(head + '<div class="empty">자료를 불러오는 중…</div>');
+
+  let files = [], err0 = '';
+  if(APPS_SCRIPT_URL){
+    try{
+      const res = await fetch(`${APPS_SCRIPT_URL}?action=assetFiles&id=${encodeURIComponent(id)}`);
+      const json = await res.json();
+      files = json.files || [];
+      if(json.error) err0 = json.error;
+    }catch(err){ err0 = String(err && err.message || err); }
+  }
+
+  const body = files.length
+    ? `<div class="sect-label">파일 ${files.length}개</div>${files.map(fileCard).join('')}`
+    : `<div class="notice">파일 목록을 불러오지 못했습니다.${err0?'<br>'+esc(err0):''}<br>아래 버튼으로 드라이브 폴더를 열어 확인하세요.</div>`;
+
+  showSheet(head + body + `
+    <div class="sheet-actions" style="margin-top:16px">
+      <button class="sa ghost" onclick="closeSheet()">닫기</button>
+      <a class="sa primary" href="${folderUrl}" target="_blank" rel="noopener">드라이브에서 열기</a>
+    </div>`);
+}
+
+/* ============ 공통 ============ */
+function showSheet(html){
+  document.getElementById('sheetBody').innerHTML = html;
+  document.getElementById('sheetBg').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+}
+function closeSheet(){
+  document.getElementById('sheetBg').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show');
+}
+function switchView(btn){
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(btn.dataset.v).classList.add('active');
+  window.scrollTo(0,0);
+}
+function renderAll(){ renderSched(); renderMedia(); renderDocs(); renderAssets(); }
+
+(async function init(){
+  renderAll();          // 예시 데이터로 즉시 표시
+  await loadData();     // 실데이터 도착하면 갱신
+  renderAll();
+})();
+</script>
+</body>
+</html>

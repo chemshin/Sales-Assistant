@@ -62,6 +62,11 @@
   .tab.sm{flex:0 0 auto;padding:7px 13px;font-size:12.5px;border-radius:9px;}
   .tab.sm.on{background:var(--gold);color:var(--ink);border-color:var(--gold);}
   .tab-empty{font-size:12px;color:var(--faint);padding:7px 2px;}
+  .tab.sm.carried{border-style:dashed;color:var(--faint);}      /* 파일 없는 날 = 전날 편성 유지 */
+  .tab.sm.carried.on{background:#D8C08A;border-style:dashed;border-color:var(--gold);color:var(--ink);}
+  .carry{display:inline-block;font-size:10px;font-weight:800;margin-left:6px;
+    background:var(--gold-soft);color:#6b531c;border:1px dashed #D8C08A;border-radius:99px;padding:2px 8px;}
+  .carry.sm{margin-left:0;padding:1px 6px;font-size:9.5px;}
 
   /* ---------- SUMMARY ---------- */
   .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:16px;}
@@ -218,6 +223,32 @@
   .notice b{font-weight:800;}
   .empty{text-align:center;padding:44px 20px;color:var(--faint);font-size:13px;}
 
+  /* ---------- 로딩 오버레이 ---------- */
+  .app.busy{filter:blur(7px) saturate(.7);pointer-events:none;user-select:none;}
+  .loader{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;
+    background:rgba(245,246,248,.55);transition:opacity .35s ease;}
+  .loader.hide{opacity:0;pointer-events:none;}
+  .loader-box{width:min(320px,80vw);text-align:center;background:var(--surface);
+    border:1px solid var(--line);border-radius:18px;padding:26px 24px;
+    box-shadow:0 8px 30px rgba(11,31,58,.14);}
+  .loader-title{font-size:15px;font-weight:800;letter-spacing:-.03em;}
+  .loader-sub{font-size:12.5px;color:var(--muted);margin:6px 0 16px;min-height:18px;}
+  .bar{height:6px;border-radius:99px;background:#EAEDF1;overflow:hidden;}
+  .bar > i{display:block;height:100%;width:0;border-radius:99px;
+    background:linear-gradient(90deg,var(--ink),var(--gold));transition:width .45s ease;}
+  .loader-pct{font-size:11px;font-weight:800;color:var(--faint);margin-top:9px;font-variant-numeric:tabular-nums;}
+
+  /* 뒤에서 채워지는 중임을 알리는 작은 표시 */
+  .bg-load{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;
+    color:var(--faint);background:var(--bg);border:1px solid var(--line);
+    border-radius:99px;padding:4px 10px;margin-left:6px;}
+  .bg-load .spin{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--line);
+    border-top-color:var(--gold);animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .skel{background:linear-gradient(90deg,#EEF0F3 25%,#F6F7F9 37%,#EEF0F3 63%);
+    background-size:400% 100%;animation:shim 1.2s ease infinite;border-radius:10px;height:66px;margin-bottom:10px;}
+  @keyframes shim{0%{background-position:100% 50%}100%{background-position:0 50%}}
+
   /* ---------- SHEET ---------- */
   .sheet-bg{position:fixed;inset:0;background:rgba(11,31,58,.45);z-index:60;opacity:0;pointer-events:none;
     transition:opacity .25s;backdrop-filter:blur(2px);}
@@ -330,6 +361,7 @@
           <h2>매체 편성표</h2>
           <div class="vsub" id="schedMeta">—</div>
         </div>
+        <div id="connNotice"></div>
         <div class="tabrow" id="schedChips"></div>
         <div class="tabrow date" id="dateChips"></div>
         <div class="summary" id="schedStats"></div>
@@ -408,6 +440,16 @@
     </nav>
   </div>
 
+  <!-- 첫 데이터가 도착할 때까지 화면을 가리는 로딩 오버레이 -->
+  <div class="loader" id="loader">
+    <div class="loader-box">
+      <div class="loader-title">비즈솔루션본부 OOH</div>
+      <div class="loader-sub" id="loaderMsg">편성표를 불러오는 중…</div>
+      <div class="bar"><i id="bar"></i></div>
+      <div class="loader-pct" id="loaderPct">0%</div>
+    </div>
+  </div>
+
   <div class="sheet-bg" id="sheetBg" onclick="closeSheet()">
     <div class="sheet" id="sheet" onclick="event.stopPropagation()">
       <div class="grab"></div>
@@ -425,6 +467,9 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwJjYyGr-97mS4
 
 let dataSource = 'demo';
 let loadErrors = {};
+let knownDates = [];        // 서버가 알려준 전체 날짜 (탭 개수 미리 파악용)
+let historyLoading = true;  // 과거 날짜 로딩 중 여부
+let filesLoading = true;    // 드라이브 파일 로딩 중 여부
 
 const venues = [
   { id:'cmt',     short:'CMT',  name:'코엑스 미디어타워',   type:'대형 LED 미디어타워', loc:'삼성동 코엑스',      hours:'06:00~24:00', cycle:'1일 102 cycle' },
@@ -751,17 +796,36 @@ const esc     = s => String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>
 const mb      = n => n >= 1048576 ? (n/1048576).toFixed(1)+'MB' : Math.max(1,Math.round(n/1024))+'KB';
 const r2      = n => Math.round(n*100)/100;
 
-function latestDate(vid){
-  const ds = sched.filter(b=>b.v===vid).map(b=>b.d).sort();
-  return ds.length ? ds[ds.length-1] : null;
+/* ---------- 날짜 해석 ----------
+   편성표 파일이 없는 날은 "전날과 변동 없음"을 뜻합니다.
+   따라서 날짜 탭은 전체 매체의 날짜를 합집합으로 만들고,
+   해당 매체에 그 날짜가 없으면 직전 편성을 그대로 이어서 보여줍니다. */
+
+/** 전체 매체를 통틀어 존재하는 날짜 (최신순) */
+function allDates(){
+  return [...new Set(sched.map(b=>b.d))].sort().reverse();
 }
+/** 해당 매체에 존재하는 날짜 (최신순) */
 function datesOf(vid){
   return [...new Set(sched.filter(b=>b.v===vid).map(b=>b.d))].sort().reverse();
 }
+/** vid 기준으로 date 이하에서 가장 가까운 실제 편성일. 없으면 null */
+function resolveDate(vid, date){
+  const ds = datesOf(vid);                 // 최신순
+  for(const d of ds){ if(d <= date) return d; }
+  return null;
+}
+/** 선택한 날짜에 보여줄 편성 행 + 실제 기준일 + 이월 여부 */
+function rowsFor(vid, date){
+  const eff = date ? resolveDate(vid, date) : (datesOf(vid)[0] || null);
+  if(!eff) return { rows:[], eff:null, carried:false };
+  return { rows: sched.filter(b=>b.v===vid && b.d===eff), eff, carried: !!date && eff !== date };
+}
+function latestDate(vid){ return datesOf(vid)[0] || null; }
+
 /** 구좌 집계: 유가(상업) / 서비스(공익+건물주) */
 function slotStats(vid, date){
-  const d = date || latestDate(vid);
-  const it = sched.filter(b=>b.v===vid && b.d===d);
+  const it = rowsFor(vid, date).rows;
   const paid = r2(it.filter(b=>b.c==='상업').reduce((s,b)=>s+b.s,0));
   const svc  = r2(it.filter(b=>b.c!=='상업').reduce((s,b)=>s+b.s,0));
   const total = r2(paid+svc);
@@ -769,69 +833,61 @@ function slotStats(vid, date){
 }
 
 /* ---------- 데이터 로드 ---------- */
-async function loadData(){
-  if(!APPS_SCRIPT_URL) return;
-  try{
-    const res = await fetch(APPS_SCRIPT_URL);
-    const json = await res.json();
-    if(json.bookings && json.bookings.length){
-      sched.length = 0;
-      json.bookings.forEach(b=>sched.push({
-        d:b.date, v:String(b.venue), no:String(b.no||''), a:b.advertiser, r:Number(b.runtime)||0,
-        s:Number(b.slots)||0, st:b.start, en:b.end,
-        c:String(b.category||'상업').trim(), n:b.note||''
-      }));
-      schedDate = null;
-      dataSource = 'live';
-    }
-    // 빈 배열([])은 JS 에서 참이므로 length 로 판단해야 합니다.
-    // 서버가 빈 목록을 주면 예시 데이터를 유지하고 에러를 표시합니다.
-    if(Array.isArray(json.docs) && json.docs.length){ docs.length = 0; json.docs.forEach(f=>docs.push(f)); }
-    if(Array.isArray(json.assets) && json.assets.length){ assets = json.assets; }
-
-    if(Array.isArray(json.industries)){
-      industryMap = {};
-      json.industries.forEach(r=>{ if(r.advertiser && r.industry) industryMap[r.advertiser] = r.industry; });
-    }
-    if(json.errors){ loadErrors = json.errors; }
-    if(json.error){ loadErrors.top = json.error; }
-  }catch(err){
-    console.warn('데이터 로드 실패 — 예시 데이터로 표시합니다.', err);
-    loadErrors.top = String(err && err.message || err);
-    dataSource = 'demo';
-  }
-}
-
 /* ============ 편성표 ============ */
 let schedVenue = 'cmt';
 let schedDate  = null;
 
 function renderSched(){
   const v = venues.find(x=>x.id===schedVenue) || venues[0];
-  const dates = datesOf(v.id);
+  const dates = allDates();                         // ★ 전체 매체 합집합
   if(!dates.includes(schedDate)) schedDate = dates[0] || null;
 
   document.getElementById('schedChips').innerHTML = venues.map(x=>
     `<button class="tab${x.id===schedVenue?' on':''}" onclick="pickSchedVenue('${x.id}')">${x.short}</button>`).join('');
 
-  document.getElementById('dateChips').innerHTML = dates.length
-    ? dates.map(d=>`<button class="tab sm${d===schedDate?' on':''}" onclick="pickSchedDate('${d}')">${fmtD(d)}</button>`).join('')
-    : '<span class="tab-empty">편성 데이터 없음</span>';
+  const pending = historyLoading && knownDates.length > dates.length;
+  document.getElementById('dateChips').innerHTML = (dates.length
+    ? dates.map(d=>{
+        const own = datesOf(v.id).includes(d);      // 이 매체에 실제 파일이 있는 날인지
+        return `<button class="tab sm${d===schedDate?' on':''}${own?'':' carried'}" onclick="pickSchedDate('${d}')">${fmtD(d)}</button>`;
+      }).join('')
+    : '<span class="tab-empty">편성 데이터 없음</span>')
+    + (pending ? `<span class="bg-load"><span class="spin"></span>이전 ${knownDates.length - dates.length}일 불러오는 중</span>` : '');
 
+  const R  = rowsFor(v.id, schedDate);
   const st = slotStats(v.id, schedDate);
+
   document.getElementById('schedStats').innerHTML = `
     <div class="stat"><div class="num">${st.items.length}</div><div class="lab">편성 광고주</div></div>
     <div class="stat"><div class="num">${st.total}</div><div class="lab">총 구좌</div></div>
     <div class="stat"><div class="num">${st.pct}<small>%</small></div><div class="lab">유가 점유율</div></div>`;
 
-  const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
-  document.getElementById('schedMeta').innerHTML =
-    `${v.name} · 운영 ${v.hours}${schedDate?' · '+fmtFull(schedDate)+' 기준':''} ${tag}`;
+  renderConnNotice();
 
-  renderTable(st.items);
+  const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
+  const carry = R.carried
+    ? `<span class="carry">${fmtD(R.eff)} 편성 유지 · 변동 없음</span>` : '';
+  document.getElementById('schedMeta').innerHTML =
+    `${v.name} · 운영 ${v.hours}${schedDate?' · '+fmtFull(schedDate)+' 기준':''} ${tag}${carry}`;
+
+  renderTable(R.rows, schedDate);
 }
 
-function renderTable(items){
+/** 실데이터 연결에 실패했을 때 원인과 조치를 화면에 보여줍니다. */
+function renderConnNotice(){
+  const box = document.getElementById('connNotice');
+  if(!box) return;
+  if(dataSource === 'live' && !loadErrors.top){ box.innerHTML = ''; return; }
+  const why = loadErrors.top ? esc(loadErrors.top) : '서버에 연결하지 못했습니다.';
+  const diag = APPS_SCRIPT_URL ? APPS_SCRIPT_URL + '?action=diag' : '';
+  box.innerHTML = `<div class="notice">
+    <b>예시 데이터를 표시하고 있습니다.</b><br>${why}<br>
+    ${diag?`<a href="${diag}" target="_blank" rel="noopener" style="text-decoration:underline">진단 페이지 열기 (?action=diag)</a> · `:''}
+    브라우저 개발자도구 콘솔에도 상세 원인이 찍힙니다.
+  </div>`;
+}
+
+function renderTable(items, viewDate){
   const t = today0();
   const noKey = b => b.no==='SYNC' ? 9999 : (parseInt(b.no,10) || 9999);
   const rows = items.slice().sort((a,b)=> noKey(a)-noKey(b));   // 원본 No. 순서
@@ -842,7 +898,8 @@ function renderTable(items){
     const endCell = left < 0 ? `<span class="d-gone">${fmtD(b.en)}</span>`
       : left <= 14 ? `<span class="d-soon">${b.en.slice(5).replace('-','/')} · ${left===0?'오늘':'D-'+left}</span>`
       : `<span class="d-far">${b.en}</span>`;
-    const isNew = b.st === b.d;   // 기준일에 시작 = 신규 편성
+    const isNew = b.st === (viewDate || b.d);   // 선택한 날짜에 시작 = 신규 편성
+                                               // (이월된 날짜에는 NEW 를 붙이지 않습니다)
     return `<tr class="${b.c==='상업'?'':'r-svc'}" onclick="openBooking(${gi})">
       <td class="td-no">${b.no==='SYNC'?'<span class="sync">SYNC</span>':esc(b.no)}</td>
       <td class="td-adv"><span class="dot" style="background:${CAT_COLOR[b.c]||'var(--ink)'}"></span>
@@ -891,14 +948,17 @@ function renderMedia(){
   const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
   document.getElementById('mediaMeta').innerHTML = `매체별 구좌 점유 현황 ${tag}`;
 
+  const gLatest = allDates()[0] || null;
   document.getElementById('mediaGrid').innerHTML = venues.map(v=>{
-    const st = slotStats(v.id);
+    const st = slotStats(v.id, gLatest);
+    const R  = rowsFor(v.id, gLatest);
     const cls = st.pct>=70 ? 'ok' : st.pct>=40 ? 'warn' : 'danger';
     const txt = st.pct>=70 ? '양호' : st.pct>=40 ? '주의' : '부족';
     const deg = st.pct*3.6;
     return `<div class="media-card" onclick="openVenue('${v.id}')">
       <div class="mc-top">
-        <div><div class="mc-name">${v.short} · ${v.name}</div><div class="mc-type">${v.type} · ${v.loc}</div></div>
+        <div><div class="mc-name">${v.short} · ${v.name}</div>
+          <div class="mc-type">${v.type} · ${v.loc}${R.carried?` · <span class="carry sm">${fmtD(R.eff)} 유지</span>`:''}</div></div>
         <span class="badge ${cls}">${txt}</span>
       </div>
       <div class="mc-body">
@@ -918,7 +978,9 @@ function renderMedia(){
 
 function openVenue(vid){
   const v = venues.find(x=>x.id===vid);
-  const st = slotStats(vid);
+  const gLatest = allDates()[0] || null;
+  const R = rowsFor(vid, gLatest);
+  const st = slotStats(vid, gLatest);
   // 패널에서는 같은 광고주를 합쳐 보여줍니다 (구좌 합계)
   const roll = list => {
     const m = {};
@@ -930,7 +992,7 @@ function openVenue(vid){
   const row = b => `<div class="padv"><span class="pa-n">${esc(b.a)}${b.n>1?`<span class="pa-x">×${b.n}</span>`:''}</span><span class="pa-s">${b.s?b.s+'구좌':'SYNC'} · ${b.r}s</span></div>`;
   showSheet(`
     <h3>${v.short} · ${v.name}</h3>
-    <div class="s-type">${v.type} · ${v.loc} · ${latestDate(vid)?fmtFull(latestDate(vid))+' 기준':''}</div>
+    <div class="s-type">${v.type} · ${v.loc} · ${R.eff?fmtFull(R.eff)+' 기준':''}${R.carried?' (이월)':''}</div>
     <div class="spec-grid">
       <div class="spec"><div class="k">유가 점유율</div><div class="v">${st.pct}%</div></div>
       <div class="spec"><div class="k">총 구좌</div><div class="v">${st.total}구좌</div></div>
@@ -973,6 +1035,10 @@ function filterFiles(list, q){
   return q ? list.filter(f=>f.name.toLowerCase().includes(q)) : list;
 }
 function renderDocs(){
+  if(filesLoading && dataSource==='live'){
+    document.getElementById('docGrid').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+    return;
+  }
   const q = (document.getElementById('docSearch')||{}).value;
   const list = filterFiles(docs, q);
   document.getElementById('docGrid').innerHTML = list.length
@@ -994,6 +1060,13 @@ function pickAssetInd(i){ assetInd = i; renderAssets(); }
 function renderAssets(){
   const q = ((document.getElementById('assetSearch')||{}).value||'').trim().toLowerCase();
   const notice = document.getElementById('assetNotice');
+
+  if(filesLoading && dataSource==='live'){
+    notice.innerHTML = '';
+    document.getElementById('assetGrid').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+    document.getElementById('assetCount').textContent = '불러오는 중…';
+    return;
+  }
 
   if(!assets.length){
     notice.innerHTML = `<div class="notice"><b>게첨자료를 불러오지 못했습니다.</b><br>
@@ -1120,12 +1193,137 @@ function switchView(btn){
   document.getElementById(btn.dataset.v).classList.add('active');
   window.scrollTo(0,0);
 }
+
+/* ============ 단계별 로딩 ============
+   ① latest  : 최신 1일치 편성 → 이것만 오면 바로 화면을 엽니다
+   ② history : 나머지 날짜 (뒤에서 조용히)
+   ③ files   : 소개서·게첨자료 (드라이브라 느림, 뒤에서 조용히)      */
+
+function setProgress(pct, msg){
+  const bar = document.getElementById('bar');
+  const pctEl = document.getElementById('loaderPct');
+  const msgEl = document.getElementById('loaderMsg');
+  if(bar) bar.style.width = pct + '%';
+  if(pctEl) pctEl.textContent = Math.round(pct) + '%';
+  if(msg && msgEl) msgEl.textContent = msg;
+}
+function revealApp(){
+  setProgress(100, '완료');
+  setTimeout(()=>{
+    document.getElementById('loader').classList.add('hide');
+    document.getElementById('app').classList.remove('busy');
+  }, 220);
+}
+
+function api(action, extra){
+  const q = APPS_SCRIPT_URL + '?action=' + action + (extra||'');
+  return fetch(q).then(async res=>{
+    if(!res.ok) throw new Error('HTTP ' + res.status + ' ' + res.statusText);
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); }
+    catch(e){
+      throw new Error(/<html/i.test(text)
+        ? '서버가 JSON 대신 HTML(로그인 페이지)을 반환했습니다. 배포 설정의 액세스 권한을 "모든 사용자"로 바꾸세요.'
+        : 'JSON 파싱 실패: ' + text.slice(0,120));
+    }
+    if(json.error) throw new Error(json.error);
+    return json;
+  });
+}
+
+function toRow(b){
+  return { d:b.date, v:String(b.venue), no:String(b.no||''), a:b.advertiser,
+           r:Number(b.runtime)||0, s:Number(b.slots)||0, st:b.start, en:b.end,
+           c:String(b.category||'상업').trim(), n:b.note||'' };
+}
+
+/** ① 최신 편성 — 이것만 성공하면 화면을 엽니다 */
+async function loadLatest(){
+  if(!APPS_SCRIPT_URL){ loadErrors.top = 'APPS_SCRIPT_URL 이 비어 있습니다.'; return false; }
+  const json = await api('latest');
+  if(!Array.isArray(json.bookings) || !json.bookings.length){
+    loadErrors.top = "서버 응답은 정상인데 '편성표' 탭이 비어 있습니다. Apps Script 에서 rebuildAll → runIngest 를 실행하세요.";
+    return false;
+  }
+  if(json.bookings[0].date === undefined){
+    loadErrors.top = '서버가 date 컬럼을 내려주지 않습니다. Code.gs 가 옛 버전입니다 — 재배포(새 버전)가 필요합니다.';
+    return false;
+  }
+  sched.length = 0;
+  json.bookings.forEach(b=>sched.push(toRow(b)));
+  if(Array.isArray(json.venues) && json.venues.length){
+    venues.length = 0; json.venues.forEach(v=>venues.push(v));
+  }
+  knownDates = Array.isArray(json.dates) ? json.dates : [];
+  schedDate = json.latest || null;
+  dataSource = 'live';
+  return true;
+}
+
+/** ② 과거 날짜 — 화면을 보여주는 동안 뒤에서 */
+async function loadHistory(){
+  const json = await api('history');
+  if(Array.isArray(json.bookings) && json.bookings.length){
+    sched.length = 0;
+    json.bookings.forEach(b=>sched.push(toRow(b)));
+  }
+}
+
+/** ③ 소개서·게첨자료 — 드라이브 조회라 느림 */
+async function loadFiles(){
+  const json = await api('files');
+  if(Array.isArray(json.docs)   && json.docs.length){ docs.length = 0; json.docs.forEach(f=>docs.push(f)); }
+  if(Array.isArray(json.assets) && json.assets.length){ assets = json.assets; }
+  if(Array.isArray(json.industries)){
+    industryMap = {};
+    json.industries.forEach(r=>{ if(r.advertiser && r.industry) industryMap[r.advertiser] = r.industry; });
+  }
+  if(json.errors) loadErrors = Object.assign({}, loadErrors, json.errors);
+}
+
+/** 실패 시: 예시 데이터로 내려앉고 원인을 배너로 알립니다 */
+function fallbackToDemo(err){
+  const m = String(err && err.message || err || '');
+  console.warn('데이터 로드 실패 — 예시 데이터로 표시합니다.', err);
+  if(m) loadErrors.top = /Failed to fetch|NetworkError|CORS/i.test(m)
+    ? m + ' — 배포 설정에서 액세스 권한이 "모든 사용자"인지, URL 이 /exec 로 끝나는지 확인하세요.'
+    : m;
+  dataSource = 'demo';
+}
+
 function renderAll(){ renderSched(); renderMedia(); renderDocs(); renderAssets(); }
 
 (async function init(){
-  renderAll();          // 예시 데이터로 즉시 표시
-  await loadData();     // 실데이터 도착하면 갱신
+  document.getElementById('app').classList.add('busy');
+  setProgress(12, '편성표를 불러오는 중…');
+
+  // ① 최신 편성
+  try {
+    const ok = await loadLatest();
+    if(!ok) fallbackToDemo(null);
+  } catch(err){ fallbackToDemo(err); }
+
+  setProgress(70, '화면을 준비하는 중…');
   renderAll();
+  revealApp();
+
+  // ② 과거 날짜 (백그라운드)
+  if(dataSource === 'live'){
+    loadHistory()
+      .catch(err=>console.warn('과거 편성 로드 실패', err))
+      .finally(()=>{ historyLoading = false; renderSched(); renderMedia(); });
+  }
+
+  // ③ 드라이브 파일 (백그라운드)
+  if(dataSource === 'live'){
+    loadFiles()
+      .catch(err=>{ loadErrors.assets = loadErrors.assets || String(err && err.message || err); })
+      .finally(()=>{ filesLoading = false; renderDocs(); renderAssets(); });
+  } else {
+    filesLoading = false; historyLoading = false;
+    renderDocs(); renderAssets();
+  }
 })();
 </script>
 </body>

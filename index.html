@@ -62,6 +62,8 @@
   .tab.sm{flex:0 0 auto;padding:7px 13px;font-size:12.5px;border-radius:9px;}
   .tab.sm.on{background:var(--gold);color:var(--ink);border-color:var(--gold);}
   .tab-empty{font-size:12px;color:var(--faint);padding:7px 2px;}
+  .tab.sm.far{opacity:.5;}                                       /* 아직 안 받은 날 (누르면 로드) */
+  .tab.sm.loading{opacity:.75;}
   .tab.sm.carried{border-style:dashed;color:var(--faint);}      /* 파일 없는 날 = 전날 편성 유지 */
   .tab.sm.carried.on{background:#D8C08A;border-style:dashed;border-color:var(--gold);color:var(--ink);}
   .carry{display:inline-block;font-size:10px;font-weight:800;margin-left:6px;
@@ -467,8 +469,10 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwJjYyGr-97mS4
 
 let dataSource = 'demo';
 let loadErrors = {};
+let serverToday = null;
 let knownDates = [];        // 서버가 알려준 전체 날짜 (탭 개수 미리 파악용)
-let historyLoading = true;  // 과거 날짜 로딩 중 여부
+let loadedDates = {};       // 이미 받아온 날짜 { 'YYYY-MM-DD': true }
+let dateLoading = false;    // 특정 날짜 로딩 중 여부
 let filesLoading = true;    // 드라이브 파일 로딩 중 여부
 
 const venues = [
@@ -845,14 +849,21 @@ function renderSched(){
   document.getElementById('schedChips').innerHTML = venues.map(x=>
     `<button class="tab${x.id===schedVenue?' on':''}" onclick="pickSchedVenue('${x.id}')">${x.short}</button>`).join('');
 
-  const pending = historyLoading && knownDates.length > dates.length;
-  document.getElementById('dateChips').innerHTML = (dates.length
-    ? dates.map(d=>{
-        const own = datesOf(v.id).includes(d);      // 이 매체에 실제 파일이 있는 날인지
-        return `<button class="tab sm${d===schedDate?' on':''}${own?'':' carried'}" onclick="pickSchedDate('${d}')">${fmtD(d)}</button>`;
+  // 날짜 탭은 서버가 알려준 전체 날짜(knownDates)로 그립니다.
+  //  · 아직 안 받은 날짜 = 흐리게, 누르면 그때 불러옴
+  //  · 이 매체에 편성이 없는 날 = 점선(전날 편성 이월)
+  const tabs = (knownDates.length ? knownDates : dates);
+  document.getElementById('dateChips').innerHTML = tabs.length
+    ? tabs.map(d=>{
+        const loaded = loadedDates[d];
+        const own = loaded && datesOf(v.id).includes(d);
+        const cls = [ 'tab','sm',
+          d===schedDate ? 'on' : '',
+          !loaded ? 'far' : (own ? '' : 'carried'),
+          (dateLoading && d===schedDate) ? 'loading' : '' ].filter(Boolean).join(' ');
+        return `<button class="${cls}" onclick="pickSchedDate('${d}')">${fmtD(d)}${(dateLoading&&d===schedDate)?' …':''}</button>`;
       }).join('')
-    : '<span class="tab-empty">편성 데이터 없음</span>')
-    + (pending ? `<span class="bg-load"><span class="spin"></span>이전 ${knownDates.length - dates.length}일 불러오는 중</span>` : '');
+    : '<span class="tab-empty">편성 데이터 없음</span>';
 
   const R  = rowsFor(v.id, schedDate);
   const st = slotStats(v.id, schedDate);
@@ -914,8 +925,27 @@ function renderTable(items, viewDate){
       <td class="td-note col-note">${esc(b.n||'')}</td></tr>`;
   }).join('');
 }
-function pickSchedVenue(id){ schedVenue=id; renderSched(); }
-function pickSchedDate(d){ schedDate=d; renderSched(); }
+async function pickSchedVenue(id){ schedVenue=id; renderSched();
+  // 이월 표시를 위해 해당 매체의 직전 편성일도 필요할 수 있음
+  await ensureAround(schedDate);
+}
+async function pickSchedDate(d){
+  schedDate=d; renderSched();
+  await ensureAround(d);
+}
+/** 선택일과 그 근처(이월 계산용 직전일 포함)를 확보 */
+async function ensureAround(d){
+  if(!d) return;
+  await ensureDate(d);
+  // 선택일 이하에서 아직 안 받은 날짜가 있으면, 이월 원본을 찾기 위해 하나 더 확보
+  const idx = knownDates.indexOf(d);
+  if(idx >= 0){
+    for(let k=idx+1; k<knownDates.length; k++){
+      if(!loadedDates[knownDates[k]]){ await ensureDate(knownDates[k]); break; }
+      if(sched.some(b=>b.v===schedVenue && b.d===knownDates[k])) break;
+    }
+  }
+}
 
 function openBooking(i){
   const b = sched[i];
@@ -1251,22 +1281,32 @@ async function loadLatest(){
     return false;
   }
   sched.length = 0;
-  json.bookings.forEach(b=>sched.push(toRow(b)));
+  loadedDates = {};
+  json.bookings.forEach(b=>{ sched.push(toRow(b)); loadedDates[b.date] = true; });
   if(Array.isArray(json.venues) && json.venues.length){
     venues.length = 0; json.venues.forEach(v=>venues.push(v));
   }
   knownDates = Array.isArray(json.dates) ? json.dates : [];
+  serverToday = json.today || null;
   schedDate = json.latest || null;
   dataSource = 'live';
   return true;
 }
 
-/** ② 과거 날짜 — 화면을 보여주는 동안 뒤에서 */
-async function loadHistory(){
-  const json = await api('history');
-  if(Array.isArray(json.bookings) && json.bookings.length){
-    sched.length = 0;
-    json.bookings.forEach(b=>sched.push(toRow(b)));
+/** 특정 날짜를 서버에서 받아 sched 에 추가합니다 (탭 클릭 시). 이미 있으면 건너뜀 */
+async function ensureDate(date){
+  if(!date || loadedDates[date] || dataSource!=='live') return;
+  dateLoading = true; renderSched();
+  try{
+    const json = await api('byDate', '&date=' + encodeURIComponent(date));
+    if(Array.isArray(json.bookings)){
+      json.bookings.forEach(b=>sched.push(toRow(b)));
+    }
+    loadedDates[date] = true;   // 데이터가 0건이어도 '읽었음'으로 표시(재요청 방지)
+  }catch(err){
+    console.warn('날짜 로드 실패', date, err);
+  }finally{
+    dateLoading = false; renderSched(); renderMedia();
   }
 }
 
@@ -1308,12 +1348,8 @@ function renderAll(){ renderSched(); renderMedia(); renderDocs(); renderAssets()
   renderAll();
   revealApp();
 
-  // ② 과거 날짜 (백그라운드)
-  if(dataSource === 'live'){
-    loadHistory()
-      .catch(err=>console.warn('과거 편성 로드 실패', err))
-      .finally(()=>{ historyLoading = false; renderSched(); renderMedia(); });
-  }
+  // ② 기본 표시일 주변(이월 계산용) 확보
+  if(dataSource === 'live'){ ensureAround(schedDate); }
 
   // ③ 드라이브 파일 (백그라운드)
   if(dataSource === 'live'){
@@ -1321,7 +1357,7 @@ function renderAll(){ renderSched(); renderMedia(); renderDocs(); renderAssets()
       .catch(err=>{ loadErrors.assets = loadErrors.assets || String(err && err.message || err); })
       .finally(()=>{ filesLoading = false; renderDocs(); renderAssets(); });
   } else {
-    filesLoading = false; historyLoading = false;
+    filesLoading = false;
     renderDocs(); renderAssets();
   }
 })();

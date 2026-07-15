@@ -1282,6 +1282,7 @@ async function loadLatest(){
   }
   sched.length = 0;
   loadedDates = {};
+  inflight = {};
   json.bookings.forEach(b=>{ sched.push(toRow(b)); loadedDates[b.date] = true; });
   if(Array.isArray(json.venues) && json.venues.length){
     venues.length = 0; json.venues.forEach(v=>venues.push(v));
@@ -1294,20 +1295,28 @@ async function loadLatest(){
 }
 
 /** 특정 날짜를 서버에서 받아 sched 에 추가합니다 (탭 클릭 시). 이미 있으면 건너뜀 */
+let inflight = {};   // 같은 날짜 동시 요청 방지
 async function ensureDate(date){
-  if(!date || loadedDates[date] || dataSource!=='live') return;
+  if(!date || dataSource!=='live') return;
+  if(loadedDates[date]) return;             // 이미 로드됨
+  if(inflight[date]) return inflight[date];  // 로딩 중이면 그 약속을 재사용
+
   dateLoading = true; renderSched();
-  try{
-    const json = await api('byDate', '&date=' + encodeURIComponent(date));
-    if(Array.isArray(json.bookings)){
-      json.bookings.forEach(b=>sched.push(toRow(b)));
+  inflight[date] = (async()=>{
+    try{
+      const json = await api('byDate', '&date=' + encodeURIComponent(date));
+      // ★ 병합 전에 이 날짜의 기존 행을 먼저 제거 → 몇 번 불러도 중복 안 생김
+      for(let i=sched.length-1; i>=0; i--){ if(sched[i].d === date) sched.splice(i,1); }
+      if(Array.isArray(json.bookings)){
+        json.bookings.forEach(b=>sched.push(toRow(b)));
+      }
+      loadedDates[date] = true;   // 0건이어도 '읽었음'으로 표시(재요청 방지)
+    }catch(err){
+      console.warn('날짜 로드 실패', date, err);
     }
-    loadedDates[date] = true;   // 데이터가 0건이어도 '읽었음'으로 표시(재요청 방지)
-  }catch(err){
-    console.warn('날짜 로드 실패', date, err);
-  }finally{
-    dateLoading = false; renderSched(); renderMedia();
-  }
+  })();
+  try { await inflight[date]; }
+  finally { delete inflight[date]; dateLoading = false; renderSched(); renderMedia(); }
 }
 
 /** ③ 소개서·게첨자료 — 드라이브 조회라 느림 */

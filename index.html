@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#0B1F3A" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>비즈솔루션본부 OOH</title>
+<title>영지씨 · 영업지원시스템</title>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
 <style>
@@ -116,6 +116,16 @@
   .d-far{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;}
   .d-gone{font-size:11px;color:var(--faint);}
   .tbl-foot{font-size:11.5px;color:var(--faint);text-align:center;margin-top:11px;}
+  /* 타운보드 캠페인 리스트 */
+  .town-grp td{background:#FAFBFC;padding:9px 12px !important;font-size:11px;font-weight:800;color:var(--muted);
+    border-bottom:1px solid var(--line);}
+  .tg-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px;}
+  .tg-n{background:#fff;border:1px solid var(--line);border-radius:99px;padding:1px 7px;font-size:10px;color:var(--faint);margin-left:5px;}
+  .adv-sub2{display:block;font-size:10.5px;color:var(--faint);margin-top:2px;}
+  .td-prod{font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  .td-start,.td-end2{font-size:11.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .td-end2 .d-soon,.td-end2 .d-gone{margin-left:4px;}
+  @media (max-width:520px){ .td-start,.td-end2{font-size:10.5px;} .adv-sub2{font-size:9.5px;} }
 
   /* 좁은 화면에서는 상세 컬럼을 접고, 광고주 줄 아래 요약(adv-sub)으로 대체 */
   .col-run,.col-date,.col-cat,.col-note{display:none;}
@@ -247,6 +257,11 @@
   .bg-load .spin{width:9px;height:9px;border-radius:50%;border:1.5px solid var(--line);
     border-top-color:var(--gold);animation:spin .7s linear infinite;}
   @keyframes spin{to{transform:rotate(360deg);}}
+  .skl{display:inline-block;height:12px;border-radius:5px;vertical-align:middle;
+    background:linear-gradient(90deg,#EEF0F3 25%,#F6F7F9 37%,#EEF0F3 63%);
+    background-size:400% 100%;animation:shim 1.2s ease infinite;}
+  .skl.w20{width:20px}.skl.w30{width:28px}.skl.w40{width:40px}.skl.w50{width:52px}.skl.w60{width:64px}.skl.w70{width:78px}
+  .skel-row td{padding-top:14px;padding-bottom:14px;}
   .skel{background:linear-gradient(90deg,#EEF0F3 25%,#F6F7F9 37%,#EEF0F3 63%);
     background-size:400% 100%;animation:shim 1.2s ease infinite;border-radius:10px;height:66px;margin-bottom:10px;}
   @keyframes shim{0%{background-position:100% 50%}100%{background-position:0 50%}}
@@ -350,8 +365,8 @@
 
     <header class="topbar">
       <div>
-        <div class="tb-title">비즈솔루션본부 OOH</div>
-        <div class="tb-sub">영업 지원 대시보드</div>
+        <div class="tb-title">영.지.씨</div>
+        <div class="tb-sub">영업지원시스템</div>
       </div>
     </header>
 
@@ -391,6 +406,13 @@
           <h2>매체 현황</h2>
           <div class="vsub" id="mediaMeta">매체별 구좌 점유 현황</div>
         </div>
+        <div class="list-meta" style="justify-content:flex-start;gap:8px;margin-bottom:12px">
+          <span class="seg">
+            <button id="mmDay" class="seg-b on" onclick="setMediaMode('day')">오늘 기준</button>
+            <button id="mmMonth" class="seg-b" onclick="setMediaMode('month')">월별 재원</button>
+          </span>
+        </div>
+        <div class="chiprow" id="monthChips" style="display:none"></div>
         <div class="media-grid" id="mediaGrid"></div>
       </section>
 
@@ -445,7 +467,7 @@
   <!-- 첫 데이터가 도착할 때까지 화면을 가리는 로딩 오버레이 -->
   <div class="loader" id="loader">
     <div class="loader-box">
-      <div class="loader-title">비즈솔루션본부 OOH</div>
+      <div class="loader-title">영.지.씨</div>
       <div class="loader-sub" id="loaderMsg">편성표를 불러오는 중…</div>
       <div class="bar"><i id="bar"></i></div>
       <div class="loader-pct" id="loaderPct">0%</div>
@@ -461,7 +483,7 @@
 </div>
 <script>
 /* =========================================================
-   비즈솔루션본부 OOH — 영업 지원 대시보드
+   영.지.씨 — 영업지원시스템
    데이터: Apps Script(Code.gs) → 편성표 시트 + 드라이브 폴더
    URL 이 비었거나 실패하면 아래 예시 데이터로 동작합니다.
    ========================================================= */
@@ -470,6 +492,14 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxwJjYyGr-97mS4
 let dataSource = 'demo';
 let loadErrors = {};
 let serverToday = null;
+let townboard = null;       // 타운보드 캠페인 { townS:{campaigns,content}, townL:{...} }
+let townLoading = false;
+let townType = 'ALL';       // 유형 필터: ALL | 광고 | 바로광고 | 서비스 | 중앙콘텐트
+let townScope = 'live';     // 'live'(운행중) | 'all'(전체)
+let mediaMode = 'day';       // 'day'(오늘 편성 기준) | 'month'(재원 시트 월별)
+let monthly = null;          // 재원현황 시트 데이터 { months, venues:[{id,label,rows}] }
+let monthSel = null;         // 선택된 월 ('7월' 등)
+let monthlyLoading = false;
 let knownDates = [];        // 서버가 알려준 전체 날짜 (탭 개수 미리 파악용)
 let loadedDates = {};       // 이미 받아온 날짜 { 'YYYY-MM-DD': true }
 let dateLoading = false;    // 특정 날짜 로딩 중 여부
@@ -481,6 +511,8 @@ const venues = [
   { id:'amazing', short:'AP',   name:'어메이징 파르나스',   type:'프리미엄 몰 미디어',  loc:'파르나스몰',        hours:'07:00~23:00', cycle:'1일 131 cycle' },
   { id:'curved',  short:'CW',   name:'커브드월 홍대',      type:'대형 곡면 LED',      loc:'홍대입구',          hours:'06:00~24:00', cycle:'1일 102 cycle' },
   { id:'t204',    short:'T204', name:'T204',              type:'복합문화공간 미디어', loc:'성수동 T204',       hours:'06:00~24:00', cycle:'1일 112 cycle' },
+  { id:'townS',   short:'TB-S', name:'타운보드 S',         type:'아파트 엘리베이터 미디어', loc:'서울/수도권', hours:'상시', cycle:'PKG 캠페인', townboard:true },
+  { id:'townL',   short:'TB-L', name:'타운보드 L',         type:'아파트 엘리베이터 미디어', loc:'서울/수도권', hours:'상시', cycle:'PKG 캠페인', townboard:true },
 ];
 
 /* 편성 데이터 — 엑셀의 '▷ 편성표' 블록을 행 그대로 옮긴 것
@@ -841,10 +873,168 @@ function slotStats(vid, date){
 let schedVenue = 'cmt';
 let schedDate  = null;
 
+function loadTownboard(){
+  if(townboard || townLoading || dataSource!=='live') return Promise.resolve();
+  townLoading = true; renderSched();
+  return api('townboard').then(json=>{ townboard = json; })
+    .catch(err=>{ townboard = { error:String(err&&err.message||err) }; })
+    .finally(()=>{ townLoading = false; renderSched(); });
+}
+function pickTownType(t){ townType = t; renderSched(); }
+function setTownScope(s){ townScope = s;
+  document.getElementById && renderSched(); }
+
+const TOWN_TYPES = ['광고','바로광고','서비스','중앙콘텐트'];
+
+/** 타운보드 날짜 정규화: Date/문자열 다양한 형식 → 'YYYY-MM-DD' (실패 시 원문 유지) */
+function tbDate(v){
+  if(!v) return '';
+  const s = String(v).trim();
+  if(!s || s==='-') return '';
+  let m = s.match(/^(\d{4})[-.\/\s]+(\d{1,2})[-.\/\s]+(\d{1,2})/);   // 2026-1-1, 2026. 1. 1
+  if(m) return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);                       // M/D/YYYY
+  if(m) return `${m[3]}-${String(+m[1]).padStart(2,'0')}-${String(+m[2]).padStart(2,'0')}`;
+  // ISO 타임스탬프(2026-07-06T00:00:00...)
+  m = s.match(/^(\d{4}-\d{2}-\d{2})T/);
+  if(m) return m[1];
+  return s;   // 알 수 없는 형식은 원문 그대로 노출
+}
+const TOWN_TYPE_COLOR = { '광고':'var(--paid)', '바로광고':'#2A7F7F', '서비스':'var(--own)', '중앙콘텐트':'#7C5CBF' };
+
+/** 타운보드S/L — 캠페인 리스트 (일별 편성표와 구조가 다름) */
+function renderTownboard(v){
+  // 매체/날짜 탭 영역은 재사용, 날짜 탭 자리에 유형 필터를 넣습니다
+  document.getElementById('schedChips').innerHTML = venues.map(x=>
+    `<button class="tab${x.id===schedVenue?' on':''}" onclick="pickSchedVenue('${x.id}')">${x.short}</button>`).join('');
+
+  const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
+
+  if(dataSource!=='live'){
+    document.getElementById('dateChips').innerHTML = '';
+    document.getElementById('schedStats').innerHTML = '';
+    document.getElementById('schedMeta').innerHTML = `${v.name} · ${v.loc} ${tag}`;
+    document.getElementById('advBody').innerHTML = '';
+    setTableHeadTown(false);
+    document.querySelector('#v-sched .tbl-wrap').innerHTML =
+      '<div class="empty">타운보드 캠페인은 실데이터 연결 시 표시됩니다.</div>';
+    return;
+  }
+
+  if(!townboard && !townLoading){ loadTownboard(); }
+
+  // 유형 필터 칩 (날짜 탭 자리)
+  document.getElementById('dateChips').innerHTML =
+    ['ALL'].concat(TOWN_TYPES).map(t=>`<button class="tab sm${t===townType?' on':''}" onclick="pickTownType('${t}')">${t==='ALL'?'전체':t}</button>`).join('')
+    + `<span class="seg" style="margin-left:8px">
+        <button class="seg-b${townScope==='live'?' on':''}" onclick="setTownScope('live')">운행중</button>
+        <button class="seg-b${townScope==='all'?' on':''}" onclick="setTownScope('all')">전체</button>
+      </span>`;
+
+  if(townLoading || !townboard){
+    document.getElementById('schedStats').innerHTML = '';
+    document.getElementById('schedMeta').innerHTML = `${v.name} · ${v.loc} <span class="bg-load"><span class="spin"></span>캠페인 불러오는 중</span>`;
+    restoreTableWrap();
+    document.getElementById('advBody').innerHTML = '';
+    setTableHeadTown(true);
+    document.getElementById('advBody').innerHTML = '<tr><td colspan="5"><div class="skel" style="margin:8px 0"></div></td></tr>';
+    return;
+  }
+  if(townboard.error){
+    document.getElementById('schedMeta').innerHTML = `${v.name} ${tag}`;
+    restoreTableWrap();
+    document.querySelector('#v-sched .tbl-wrap').innerHTML = `<div class="empty">${esc(townboard.error)}</div>`;
+    return;
+  }
+
+  const data = townboard[v.id] || { campaigns:[], content:[] };
+  let all = (data.campaigns||[]).concat(data.content||[]);
+
+  // 운행중 필터 (오늘이 시작~종료 사이)
+  const today = serverToday || new Date().toISOString().slice(0,10);
+  if(townScope==='live') all = all.filter(c=>{
+    const s = tbDate(c.start), e = tbDate(c.end);
+    const sOk = !/^\d{4}-\d{2}-\d{2}$/.test(s) || s<=today;
+    const eOk = !/^\d{4}-\d{2}-\d{2}$/.test(e) || e>=today;
+    return sOk && eOk;
+  });
+  if(townType!=='ALL') all = all.filter(c=>c.type===townType);
+
+  // 통계
+  const liveCount = all.length;
+  const slotSum = r2(all.reduce((s,c)=>s+(c.slots||0),0));
+  const advCount = new Set(all.map(c=>c.advertiser)).size;
+  document.getElementById('schedStats').innerHTML = `
+    <div class="stat"><div class="num">${liveCount}</div><div class="lab">캠페인</div></div>
+    <div class="stat"><div class="num">${advCount}</div><div class="lab">광고주</div></div>
+    <div class="stat"><div class="num">${slotSum}</div><div class="lab">운행 구좌</div></div>`;
+
+  const scopeTxt = townScope==='live' ? `${fmtFull(today)} 운행중` : '전체';
+  document.getElementById('schedMeta').innerHTML = `${v.name} · ${v.loc} · ${scopeTxt} ${tag}`;
+
+  // 유형별 그룹 렌더
+  restoreTableWrap();
+  setTableHeadTown(true);
+  const order = { '광고':0, '바로광고':1, '서비스':2, '중앙콘텐트':3 };
+  const groups = {};
+  all.forEach(c=>{ (groups[c.type] = groups[c.type]||[]).push(c); });
+  const types = Object.keys(groups).sort((a,b)=>(order[a]??9)-(order[b]??9));
+
+  if(!all.length){
+    document.getElementById('advBody').innerHTML = '<tr><td colspan="5"><div class="empty">해당 조건의 캠페인이 없습니다.</div></td></tr>';
+    return;
+  }
+
+  const t0 = serverToday ? new Date(serverToday) : today0();
+  document.getElementById('advBody').innerHTML = types.map(type=>{
+    const rows = groups[type].sort((a,b)=> (b.slots-a.slots) || a.advertiser.localeCompare(b.advertiser));
+    const head = `<tr class="town-grp"><td colspan="5">
+      <span class="tg-dot" style="background:${TOWN_TYPE_COLOR[type]||'var(--ink)'}"></span>${type} <span class="tg-n">${rows.length}</span></td></tr>`;
+    const body = rows.map(c=>{
+      const sD = tbDate(c.start), eD = tbDate(c.end);
+      const eIso = /^\d{4}-\d{2}-\d{2}$/.test(eD) ? eD : null;
+      const left = eIso ? Math.round((new Date(eIso)-t0)/864e5) : null;
+      const endBadge = left==null ? ''
+        : left<0 ? '<span class="d-gone">종료</span>'
+        : left<=14 ? `<span class="d-soon">${left===0?'오늘':'D-'+left}</span>` : '';
+      return `<tr>
+        <td class="td-adv"><span class="adv-name">${esc(c.advertiser)}</span>
+          <span class="adv-sub2">${esc(c.industry||'')}${c.product?' · '+esc(c.product):''}</span></td>
+        <td class="td-date td-start">${sD||'–'}</td>
+        <td class="td-date td-end2">${eD||'상시'}${endBadge?' '+endBadge:''}</td>
+        <td class="td-num">${c.slots||'–'}</td>
+        <td class="td-note col-note">${esc(c.note||'')}</td></tr>`;
+    }).join('');
+    return head + body;
+  }).join('');
+}
+
+/** 편성표 테이블 헤더를 타운보드용/일반용으로 전환 */
+function setTableHeadTown(isTown){
+  const thead = document.querySelector('#v-sched .tbl thead tr');
+  if(!thead) return;
+  thead.innerHTML = isTown
+    ? `<th class="th-adv">광고주 · 업종 · 상품</th><th class="th-date">시작일</th><th class="th-date">종료일</th>
+       <th class="th-num">구좌</th><th class="th-note col-note">특이사항</th>`
+    : `<th class="th-no">No.</th><th class="th-adv">광고주명</th><th class="th-num col-run">러닝타임</th>
+       <th class="th-num">구좌</th><th class="th-date col-date">시작일</th><th class="th-date">종료일</th>
+       <th class="th-cat col-cat">구분</th><th class="th-note col-note">비고</th>`;
+}
+/** tbl-wrap 이 empty 로 덮인 경우 원래 테이블 구조 복구 */
+function restoreTableWrap(){
+  const wrap = document.querySelector('#v-sched .tbl-wrap');
+  if(wrap && !wrap.querySelector('table')){
+    wrap.innerHTML = `<table class="tbl"><thead><tr></tr></thead><tbody id="advBody"></tbody></table>`;
+  }
+}
+
 function renderSched(){
   const v = venues.find(x=>x.id===schedVenue) || venues[0];
-  const dates = allDates();                         // ★ 전체 매체 합집합
-  if(!dates.includes(schedDate)) schedDate = dates[0] || null;
+  if(v.townboard){ renderTownboard(v); return; }
+  const dates = allDates();                         // 이미 받아온 날짜(합집합)
+  // 서버가 알려준 전체 날짜(knownDates)에 있으면, 아직 데이터를 안 받았어도 유지
+  const validDates = knownDates.length ? knownDates : dates;
+  if(!validDates.includes(schedDate)) schedDate = validDates[0] || dates[0] || null;
 
   document.getElementById('schedChips').innerHTML = venues.map(x=>
     `<button class="tab${x.id===schedVenue?' on':''}" onclick="pickSchedVenue('${x.id}')">${x.short}</button>`).join('');
@@ -867,21 +1057,49 @@ function renderSched(){
 
   const R  = rowsFor(v.id, schedDate);
   const st = slotStats(v.id, schedDate);
+  const loadingNow = dataSource==='live' && schedDate && !loadedDates[schedDate] && !!inflight[schedDate];
 
-  document.getElementById('schedStats').innerHTML = `
-    <div class="stat"><div class="num">${st.items.length}</div><div class="lab">편성 광고주</div></div>
-    <div class="stat"><div class="num">${st.total}</div><div class="lab">총 구좌</div></div>
-    <div class="stat"><div class="num">${st.pct}<small>%</small></div><div class="lab">유가 점유율</div></div>`;
+  document.getElementById('schedStats').innerHTML = loadingNow
+    ? `<div class="stat"><div class="num">–</div><div class="lab">편성 광고주</div></div>
+       <div class="stat"><div class="num">–</div><div class="lab">총 구좌</div></div>
+       <div class="stat"><div class="num">–</div><div class="lab">유가 점유율</div></div>`
+    : `<div class="stat"><div class="num">${st.items.length}</div><div class="lab">편성 광고주</div></div>
+       <div class="stat"><div class="num">${st.total}</div><div class="lab">총 구좌</div></div>
+       <div class="stat"><div class="num">${st.pct}<small>%</small></div><div class="lab">유가 점유율</div></div>`;
 
   renderConnNotice();
 
+  const loadingMeta = loadingNow
+    ? '<span class="bg-load"><span class="spin"></span>편성표 불러오는 중</span>' : '';
   const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
   const carry = R.carried
     ? `<span class="carry">${fmtD(R.eff)} 편성 유지 · 변동 없음</span>` : '';
   document.getElementById('schedMeta').innerHTML =
-    `${v.name} · 운영 ${v.hours}${schedDate?' · '+fmtFull(schedDate)+' 기준':''} ${tag}${carry}`;
+    `${v.name} · 운영 ${v.hours}${schedDate?' · '+fmtFull(schedDate)+' 기준':''} ${tag}${carry}${loadingMeta}`;
 
-  renderTable(R.rows, schedDate);
+  restoreTableWrap();
+  setTableHeadTown(false);
+  // 이 날짜를 지금 서버에서 받아오는 중이면 표 자리에 로딩을 표시
+  // (응답이 오면 loadedDates 에 기록되고, 이월이면 이월 데이터가 그려집니다)
+  if(loadingNow){
+    renderTableLoading();
+  } else {
+    renderTable(R.rows, schedDate);
+  }
+}
+
+/** 편성 데이터를 받는 동안 표 자리에 로딩 행을 표시 */
+function renderTableLoading(){
+  const row = '<tr class="skel-row">'
+    + '<td class="td-no"><span class="skl w20"></span></td>'
+    + '<td class="td-adv"><span class="skl w70"></span></td>'
+    + '<td class="td-num col-run"><span class="skl w30"></span></td>'
+    + '<td class="td-num"><span class="skl w30"></span></td>'
+    + '<td class="td-date col-date"><span class="skl w50"></span></td>'
+    + '<td class="td-date"><span class="skl w50"></span></td>'
+    + '<td class="td-cat col-cat"><span class="skl w40"></span></td>'
+    + '<td class="td-note col-note"><span class="skl w60"></span></td></tr>';
+  document.getElementById('advBody').innerHTML = row.repeat(6);
 }
 
 /** 실데이터 연결에 실패했을 때 원인과 조치를 화면에 보여줍니다. */
@@ -925,12 +1143,18 @@ function renderTable(items, viewDate){
       <td class="td-note col-note">${esc(b.n||'')}</td></tr>`;
   }).join('');
 }
-async function pickSchedVenue(id){ schedVenue=id; renderSched();
-  // 이월 표시를 위해 해당 매체의 직전 편성일도 필요할 수 있음
+async function pickSchedVenue(id){
+  schedVenue=id;
+  const v = venues.find(x=>x.id===id);
+  if(v && v.townboard){ renderSched(); loadTownboard(); return; }
+  renderSched();
   await ensureAround(schedDate);
 }
 async function pickSchedDate(d){
-  schedDate=d; renderSched();
+  schedDate=d;
+  // 아직 안 받은 날짜면 먼저 로딩 상태로 표시되도록 inflight 를 선점
+  if(dataSource==='live' && !loadedDates[d]) inflight[d] = inflight[d] || Promise.resolve();
+  renderSched();
   await ensureAround(d);
 }
 /** 선택일과 그 근처(이월 계산용 직전일 포함)를 확보 */
@@ -974,12 +1198,46 @@ function openBooking(i){
 }
 
 /* ============ 매체현황 (도넛 대시보드) ============ */
+function setMediaMode(mode){
+  mediaMode = mode;
+  document.getElementById('mmDay').classList[mode==='day'?'add':'remove']('on');
+  document.getElementById('mmMonth').classList[mode==='month'?'add':'remove']('on');
+  document.getElementById('monthChips').style.display = mode==='month' ? '' : 'none';
+  if(mode==='month' && !monthly && !monthlyLoading) loadMonthly();
+  renderMedia();
+}
+
+async function loadMonthly(){
+  if(dataSource!=='live'){ renderMedia(); return; }
+  monthlyLoading = true; renderMedia();
+  try{
+    const json = await api('monthly');
+    monthly = json;
+    if(Array.isArray(json.months) && json.months.length){
+      // 기본 선택월: 이번 달(있으면), 없으면 마지막
+      const now = (serverToday ? Number(serverToday.slice(5,7)) : (new Date().getMonth()+1)) + '월';
+      monthSel = json.months.includes(now) ? now : json.months[json.months.length-1];
+    }
+  }catch(err){
+    console.warn('월 재원 로드 실패', err);
+    monthly = { months:[], venues:[], error: String(err && err.message || err) };
+  }finally{
+    monthlyLoading = false; renderMedia();
+  }
+}
+function pickMonth(m){ monthSel = m; renderMedia(); }
+
 function renderMedia(){
   const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
-  document.getElementById('mediaMeta').innerHTML = `매체별 구좌 점유 현황 ${tag}`;
 
+  if(mediaMode === 'month'){
+    renderMediaMonth(tag);
+    return;
+  }
+
+  document.getElementById('mediaMeta').innerHTML = `매체별 구좌 점유 현황 · 오늘 편성 기준 ${tag}`;
   const gLatest = allDates()[0] || null;
-  document.getElementById('mediaGrid').innerHTML = venues.map(v=>{
+  document.getElementById('mediaGrid').innerHTML = venues.filter(v=>!v.townboard).map(v=>{
     const st = slotStats(v.id, gLatest);
     const R  = rowsFor(v.id, gLatest);
     const cls = st.pct>=70 ? 'ok' : st.pct>=40 ? 'warn' : 'danger';
@@ -1002,6 +1260,56 @@ function renderMedia(){
         </div>
       </div>
       <span class="click-hint">광고주 보기 →</span>
+    </div>`;
+  }).join('');
+}
+
+/** 월별 재원 현황 (재원현황 시트) */
+function renderMediaMonth(tag){
+  const meta = document.getElementById('mediaMeta');
+
+  if(monthlyLoading){
+    meta.innerHTML = `매체별 월 재원 현황 <span class="bg-load"><span class="spin"></span>불러오는 중</span>`;
+    document.getElementById('mediaGrid').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
+    return;
+  }
+  if(!monthly || monthly.error || !monthly.months || !monthly.months.length){
+    meta.innerHTML = `매체별 월 재원 현황 ${tag}`;
+    document.getElementById('mediaGrid').innerHTML =
+      `<div class="empty">${monthly && monthly.error ? esc(monthly.error) : (dataSource!=='live' ? '월 재원은 실데이터 연결 시 표시됩니다.' : '재원 데이터를 불러오지 못했습니다.')}</div>`;
+    return;
+  }
+
+  // 월 칩
+  document.getElementById('monthChips').innerHTML = monthly.months.map(m=>
+    `<button class="chip${m===monthSel?' on':''}" onclick="pickMonth('${m}')">${m}</button>`).join('');
+
+  meta.innerHTML = `매체별 월 재원 현황 · ${monthSel} 기준 ${tag}`;
+
+  document.getElementById('mediaGrid').innerHTML = monthly.venues.map(v=>{
+    const row = (v.rows && v.rows[monthSel]) || {};
+    const pct = row.pct;
+    const cls = pct==null ? 'warn' : pct>=70 ? 'ok' : pct>=40 ? 'warn' : 'danger';
+    const txt = pct==null ? '데이터 없음' : pct>=70 ? '양호' : pct>=40 ? '주의' : '부족';
+    const deg = (pct||0)*3.6;
+    const meta = venues.find(x=>x.id===v.id) || {name:v.label,type:'',loc:''};
+    return `<div class="media-card">
+      <div class="mc-top">
+        <div><div class="mc-name">${v.label} · ${meta.name||''}</div>
+          <div class="mc-type">${monthSel} 재원 현황</div></div>
+        <span class="badge ${cls}">${txt}</span>
+      </div>
+      <div class="mc-body">
+        <div class="donut" style="background:conic-gradient(var(--paid) 0deg ${deg}deg, var(--svc) ${deg}deg 360deg)">
+          <div class="donut-center"><div class="donut-pct">${pct==null?'–':pct+'%'}</div><div class="donut-lab">유가 점유율</div></div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><span class="legend-left"><span class="legend-dot" style="background:var(--paid)"></span>유가(사용 중)</span><span class="legend-val">${row.paid==null?'–':row.paid+'구좌'}</span></div>
+          <div class="legend-item"><span class="legend-left"><span class="legend-dot" style="background:var(--svc)"></span>잔여 구좌</span><span class="legend-val">${row.free==null?'–':row.free+'구좌'}</span></div>
+          <div class="legend-item"><span class="legend-left"><span class="legend-dot" style="background:#E4E7EC;border:1px solid var(--line)"></span>총 구좌</span><span class="legend-val">${row.total==null?'–':row.total+'구좌'}</span></div>
+          <div class="legend-item"><span class="legend-left"><span class="legend-dot" style="background:transparent"></span>1일 송출(평균)</span><span class="legend-val">${row.plays==null?'–':row.plays+'회'}</span></div>
+        </div>
+      </div>
     </div>`;
   }).join('');
 }

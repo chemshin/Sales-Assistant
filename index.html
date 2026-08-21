@@ -123,6 +123,38 @@
   .tg-n{background:#fff;border:1px solid var(--line);border-radius:99px;padding:1px 7px;font-size:10px;color:var(--faint);margin-left:5px;}
   .adv-sub2{display:block;font-size:10.5px;color:var(--faint);margin-top:2px;}
   .td-prod{font-size:11.5px;color:var(--muted);white-space:nowrap;}
+  /* 편성표 다운로드 버튼 */
+  .sched-dl{display:inline-flex;align-items:center;gap:5px;margin-left:10px;vertical-align:1px;
+    background:var(--ink);color:#fff;border:none;border-radius:8px;padding:5px 11px;
+    font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:-.01em;}
+  .sched-dl:hover{background:#12294a;}
+  .sched-dl:disabled{opacity:.6;cursor:default;}
+  .dl-ico{font-size:13px;line-height:1;}
+  .spin-ico{display:inline-block;animation:spin .8s linear infinite;}
+  /* 토스트 */
+  .toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%) translateY(20px);
+    max-width:82vw;background:var(--ink);color:#fff;padding:11px 18px;border-radius:10px;
+    font-size:12.5px;font-weight:600;box-shadow:0 8px 24px rgba(11,31,58,.28);
+    opacity:0;pointer-events:none;transition:all .28s ease;z-index:120;text-align:center;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  .toast.warn{background:#B23A3A;}
+  .toast.ok{background:#1F7A4D;}
+  @media(min-width:1000px){ .toast{bottom:32px;} }
+
+  /* 소개서 폴더 그룹 */
+  .doc-grp{margin-bottom:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface);}
+  .doc-grp-head{width:100%;display:flex;align-items:center;justify-content:space-between;
+    padding:12px 14px;background:var(--bg);border:none;cursor:pointer;text-align:left;font:inherit;}
+  .doc-grp-head:hover{background:#EFF2F6;}
+  .dg-name{font-size:13px;font-weight:800;color:var(--ink);letter-spacing:-.02em;}
+  .dg-right{display:inline-flex;align-items:center;gap:8px;}
+  .dg-count{background:var(--surface);border:1px solid var(--line);border-radius:99px;
+    padding:2px 9px;font-size:11px;font-weight:700;color:var(--faint);}
+  .dg-arrow{font-size:11px;color:var(--faint);transition:transform .2s;}
+  .dg-arrow.up{transform:rotate(180deg);}
+  .doc-grp-body{padding:8px;display:flex;flex-direction:column;gap:8px;}
+  .doc-grp-body .doc{border:1px solid var(--line);border-radius:10px;}
+  .empty.sm{padding:14px;font-size:12px;color:var(--faint);}
   .td-start,.td-end2{font-size:11.5px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums;}
   .td-end2 .d-soon,.td-end2 .d-gone{margin-left:4px;}
   @media (max-width:520px){ .td-start,.td-end2{font-size:10.5px;} .adv-sub2{font-size:9.5px;} }
@@ -504,6 +536,9 @@ let knownDates = [];        // 서버가 알려준 전체 날짜 (탭 개수 미
 let loadedDates = {};       // 이미 받아온 날짜 { 'YYYY-MM-DD': true }
 let dateLoading = false;    // 특정 날짜 로딩 중 여부
 let filesLoading = true;    // 드라이브 파일 로딩 중 여부
+let docGroups = [];         // 소개서 하위폴더 그룹 [{name, files:[...]}]
+let docLoose = [];          // 그룹 밖 파일
+let docOpen = {};           // 그룹 펼침 상태
 
 const venues = [
   { id:'cmt',     short:'CMT',  name:'코엑스 미디어타워',   type:'대형 LED 미디어타워', loc:'삼성동 코엑스',      hours:'06:00~24:00', cycle:'1일 102 cycle' },
@@ -1074,8 +1109,12 @@ function renderSched(){
   const tag = dataSource==='live' ? '<span class="src live">실데이터</span>' : '<span class="src demo">예시 데이터</span>';
   const carry = R.carried
     ? `<span class="carry">${fmtD(R.eff)} 편성 유지 · 변동 없음</span>` : '';
+  // 편성표 엑셀 다운로드 버튼 (실데이터 & 로딩 중 아닐 때만)
+  const dlBtn = (dataSource==='live' && !loadingNow && schedDate)
+    ? `<button class="sched-dl" onclick="downloadSchedFile('${v.id}','${schedDate}')" title="이 매체·날짜의 편성표 엑셀 받기">
+         <span class="dl-ico">⭳</span> 편성표 받기</button>` : '';
   document.getElementById('schedMeta').innerHTML =
-    `${v.name} · 운영 ${v.hours}${schedDate?' · '+fmtFull(schedDate)+' 기준':''} ${tag}${carry}${loadingMeta}`;
+    `${v.name} · 운영 ${v.hours}${schedDate?' · '+fmtFull(schedDate)+' 기준':''} ${tag}${carry}${loadingMeta}${dlBtn}`;
 
   restoreTableWrap();
   setTableHeadTown(false);
@@ -1377,11 +1416,62 @@ function renderDocs(){
     document.getElementById('docGrid').innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>';
     return;
   }
-  const q = (document.getElementById('docSearch')||{}).value;
+  const q = ((document.getElementById('docSearch')||{}).value||'').trim().toLowerCase();
+
+  // 그룹 데이터가 있으면 폴더별로 접이식 표시
+  if(docGroups && docGroups.length){
+    const blocks = docGroups.map((g,gi)=>{
+      const files = q ? g.files.filter(f=>(f.name||'').toLowerCase().includes(q)) : g.files;
+      if(q && !files.length) return '';
+      const open = q ? true : (docOpen[gi] !== false);   // 검색 중엔 모두 펼침, 기본 펼침
+      const head = `<button class="doc-grp-head" onclick="toggleDocGrp(${gi})">
+          <span class="dg-name">${esc(g.name)}</span>
+          <span class="dg-right"><span class="dg-count">${g.files.length}</span><span class="dg-arrow${open?' up':''}">▾</span></span>
+        </button>`;
+      const body = open
+        ? `<div class="doc-grp-body">${files.length ? files.map(fileCard).join('') : '<div class="empty sm">이 폴더에 파일이 없습니다.</div>'}</div>`
+        : '';
+      return `<div class="doc-grp">${head}${body}</div>`;
+    }).join('');
+
+    // 그룹 밖(loose) 파일
+    const loose = (typeof docLoose!=='undefined' && docLoose.length)
+      ? docLoose.filter(f=>!q || (f.name||'').toLowerCase().includes(q)) : [];
+    const looseBlock = loose.length ? `<div class="doc-grp-body">${loose.map(fileCard).join('')}</div>` : '';
+
+    const html = (blocks + looseBlock).trim();
+    document.getElementById('docGrid').innerHTML = html || '<div class="empty">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  // (구버전 호환) 평면 목록
   const list = filterFiles(docs, q);
   document.getElementById('docGrid').innerHTML = list.length
     ? list.map(fileCard).join('')
     : '<div class="empty">검색 결과가 없습니다.</div>';
+}
+function toggleDocGrp(gi){ docOpen[gi] = (docOpen[gi]===false); renderDocs(); }
+
+function fileCard(f){
+  const ext = (f.ext||'other').toLowerCase();
+  const cls = ['pdf','pptx','ppt','xlsx','xls'].includes(ext) ? ext : 'other';
+  const view = f.view || `https://drive.google.com/file/d/${f.id}/view`;
+  const dl   = f.download || `https://drive.google.com/uc?export=download&id=${f.id}`;
+  return `<div class="doc">
+    <div class="ficon ${cls}">${ext.toUpperCase().slice(0,4)}</div>
+    <div class="dmeta">
+      <div class="dname">${esc(f.name)}</div>
+      <div class="dsub">${mb(f.size)}${f.updated?' · '+f.updated:''}</div>
+    </div>
+    <div class="dacts">
+      <a class="dbtn" href="${view}" target="_blank" rel="noopener">보기</a>
+      <a class="dbtn dl" href="${dl}" target="_blank" rel="noopener">받기</a>
+    </div>
+  </div>`;
+}
+function filterFiles(list, q){
+  q = (q||'').trim().toLowerCase();
+  return q ? list.filter(f=>f.name.toLowerCase().includes(q)) : list;
 }
 let assetMedia = 'ALL';
 let assetInd   = 'ALL';
@@ -1570,6 +1660,47 @@ function api(action, extra){
   });
 }
 
+/** 편성표 엑셀 파일 찾아 다운로드. 없으면 에러 안내. */
+let schedDlBusy = false;
+async function downloadSchedFile(venue, date){
+  if(schedDlBusy) return;
+  if(dataSource!=='live'){ toast('실데이터 연결 시에만 받을 수 있습니다.'); return; }
+  schedDlBusy = true;
+  const btn = document.querySelector('.sched-dl');
+  const orig = btn ? btn.innerHTML : '';
+  if(btn){ btn.innerHTML = '<span class="dl-ico spin-ico">⭳</span> 찾는 중…'; btn.disabled = true; }
+  try{
+    const json = await api('schedFile', '&venue=' + encodeURIComponent(venue) + '&date=' + encodeURIComponent(date));
+    if(json.error || !json.file){
+      toast(json.error || '편성표 파일을 찾지 못했습니다.');
+    } else {
+      // 새 탭에서 다운로드
+      window.open(json.file.download, '_blank');
+      toast('편성표를 받습니다: ' + json.file.name, true);
+    }
+  }catch(err){
+    toast('오류: ' + (err && err.message || err));
+  }finally{
+    schedDlBusy = false;
+    if(btn){ btn.innerHTML = orig; btn.disabled = false; }
+  }
+}
+
+/** 하단 토스트 알림 */
+let toastTimer = null;
+function toast(msg, ok){
+  let el = document.getElementById('toast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = 'toast'; el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = 'toast show' + (ok ? ' ok' : ' warn');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ el.className = 'toast'; }, 3200);
+}
+
 function toRow(b){
   return { d:b.date, v:String(b.venue), no:String(b.no||''), a:b.advertiser,
            r:Number(b.runtime)||0, s:Number(b.slots)||0, st:b.start, en:b.end,
@@ -1631,6 +1762,8 @@ async function ensureDate(date){
 async function loadFiles(){
   const json = await api('files');
   if(Array.isArray(json.docs)   && json.docs.length){ docs.length = 0; json.docs.forEach(f=>docs.push(f)); }
+  if(Array.isArray(json.docGroups)){ docGroups = json.docGroups; }
+  if(Array.isArray(json.docLoose)){ docLoose = json.docLoose; }
   if(Array.isArray(json.assets) && json.assets.length){ assets = json.assets; }
   if(Array.isArray(json.industries)){
     industryMap = {};

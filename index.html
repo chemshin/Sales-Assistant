@@ -213,9 +213,10 @@
   .ficon{width:42px;height:42px;border-radius:10px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;
     font-size:10.5px;font-weight:800;color:#fff;}
   .ficon.pdf{background:#D14545;} .ficon.pptx,.ficon.ppt{background:#D98A2B;}
-  .ficon.xlsx,.ficon.xls{background:#1F9D6B;} .ficon.other{background:#8A94A6;}
+  .ficon.xlsx,.ficon.xls{background:#1F9D6B;} .ficon.mp4{background:#7C5CBF;} .ficon.other{background:#8A94A6;}
   .dmeta{flex:1;min-width:0;}
-  .dname{font-size:13.5px;font-weight:700;letter-spacing:-.02em;line-height:1.35;}
+  .dname{font-size:13.5px;font-weight:700;letter-spacing:-.02em;line-height:1.35;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .dsub{font-size:11px;color:var(--faint);margin-top:3px;}
   .dacts{display:flex;gap:6px;flex:0 0 auto;}
   .dbtn{font-size:11.5px;font-weight:700;padding:7px 10px;border-radius:9px;border:1px solid var(--line);
@@ -349,7 +350,6 @@
     :root{ --maxw:760px; --pad:24px; }
     .app-frame{box-shadow:none;}
     .media-grid{grid-template-columns:1fr 1fr;}
-    .doc-grid{grid-template-columns:1fr 1fr;}
     .sheet{max-width:560px;border-radius:22px;bottom:auto;top:50%;transform:translate(0,-40%) scale(.97);
       opacity:0;left:50%;margin-left:-280px;max-height:82dvh;}
     .sheet.show{transform:translate(0,-50%) scale(1);opacity:1;}
@@ -378,7 +378,6 @@
     .view-head h2{font-size:25px;}
     .summary{max-width:560px;}
     .media-grid{grid-template-columns:repeat(3,1fr);}
-    .doc-grid{grid-template-columns:repeat(2,1fr);}
     .asset-list{column-count:2;column-gap:12px;}
     .asset,.grp-head{break-inside:avoid;}
     .tabrow{max-width:640px;}
@@ -388,7 +387,6 @@
   }
   @media (min-width:1360px){
     :root{ --maxw:1280px; }
-    .doc-grid{grid-template-columns:repeat(3,1fr);}
   }
 </style>
 </head>
@@ -1394,19 +1392,22 @@ function jumpSched(id){ closeSheet(); pickSchedVenue(id);
 /* ============ 문서 (매체소개서 / 게첨자료) ============ */
 function fileCard(f){
   const ext = (f.ext||'other').toLowerCase();
-  const cls = ['pdf','pptx','ppt','xlsx','xls'].includes(ext) ? ext : 'other';
+  const isVid = ext==='mp4';
+  const cls = ['pdf','pptx','ppt','xlsx','xls','mp4'].includes(ext) ? ext : 'other';
   const view = f.view || `https://drive.google.com/file/d/${f.id}/view`;
   const dl   = f.download || `https://drive.google.com/uc?export=download&id=${f.id}`;
+  const acts = isVid
+    ? `<a class="dbtn dl" href="${view}" target="_blank" rel="noopener">재생</a>
+       <a class="dbtn" href="${dl}" target="_blank" rel="noopener">받기</a>`
+    : `<a class="dbtn" href="${view}" target="_blank" rel="noopener">보기</a>
+       <a class="dbtn dl" href="${dl}" target="_blank" rel="noopener">받기</a>`;
   return `<div class="doc">
-    <div class="ficon ${cls}">${ext.toUpperCase().slice(0,4)}</div>
+    <div class="ficon ${cls}">${(isVid?'MP4':ext.toUpperCase()).slice(0,4)}</div>
     <div class="dmeta">
       <div class="dname">${esc(f.name)}</div>
       <div class="dsub">${mb(f.size)}${f.updated?' · '+f.updated:''}</div>
     </div>
-    <div class="dacts">
-      <a class="dbtn" href="${view}" target="_blank" rel="noopener">보기</a>
-      <a class="dbtn dl" href="${dl}" target="_blank" rel="noopener">받기</a>
-    </div>
+    <div class="dacts">${acts}</div>
   </div>`;
 }
 function filterFiles(list, q){
@@ -1456,19 +1457,22 @@ function toggleDocGrp(gi){ docOpen[gi] = (docOpen[gi]===false); renderDocs(); }
 
 function fileCard(f){
   const ext = (f.ext||'other').toLowerCase();
-  const cls = ['pdf','pptx','ppt','xlsx','xls'].includes(ext) ? ext : 'other';
+  const isVid = ext==='mp4';
+  const cls = ['pdf','pptx','ppt','xlsx','xls','mp4'].includes(ext) ? ext : 'other';
   const view = f.view || `https://drive.google.com/file/d/${f.id}/view`;
   const dl   = f.download || `https://drive.google.com/uc?export=download&id=${f.id}`;
+  const acts = isVid
+    ? `<a class="dbtn dl" href="${view}" target="_blank" rel="noopener">재생</a>
+       <a class="dbtn" href="${dl}" target="_blank" rel="noopener">받기</a>`
+    : `<a class="dbtn" href="${view}" target="_blank" rel="noopener">보기</a>
+       <a class="dbtn dl" href="${dl}" target="_blank" rel="noopener">받기</a>`;
   return `<div class="doc">
-    <div class="ficon ${cls}">${ext.toUpperCase().slice(0,4)}</div>
+    <div class="ficon ${cls}">${(isVid?'MP4':ext.toUpperCase()).slice(0,4)}</div>
     <div class="dmeta">
       <div class="dname">${esc(f.name)}</div>
       <div class="dsub">${mb(f.size)}${f.updated?' · '+f.updated:''}</div>
     </div>
-    <div class="dacts">
-      <a class="dbtn" href="${view}" target="_blank" rel="noopener">보기</a>
-      <a class="dbtn dl" href="${dl}" target="_blank" rel="noopener">받기</a>
-    </div>
+    <div class="dacts">${acts}</div>
   </div>`;
 }
 function filterFiles(list, q){

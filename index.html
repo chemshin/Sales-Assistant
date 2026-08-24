@@ -1641,8 +1641,38 @@ function setProgress(pct, msg){
   if(pctEl) pctEl.textContent = Math.round(pct) + '%';
   if(msg && msgEl) msgEl.textContent = msg;
 }
+
+/*
+ * 자동 진행 게이지 — 서버를 기다리는 동안에도 실제처럼 차오릅니다.
+ *  · 처음엔 빠르게, 갈수록 천천히 (감속 곡선)
+ *  · 응답이 오기 전엔 90% 를 넘지 않음
+ *  · 응답이 오면 finishProgress() 가 100% 로 마무리
+ * 메시지도 경과 시간에 따라 바뀌어 살아있는 느낌을 줍니다.
+ */
+let progTimer = null;
+function startProgress(){
+  const t0 = Date.now();
+  const MSGS = [
+    [0,    '서버에 연결하는 중…'],
+    [1500, '편성표를 불러오는 중…'],
+    [4000, '데이터를 정리하는 중…'],
+    [7000, '거의 다 됐습니다…'],
+    [11000,'조금만 더 기다려 주세요…']
+  ];
+  stopProgress();
+  progTimer = setInterval(()=>{
+    const el = Date.now() - t0;
+    // 감속 곡선: 8초에 약 80%, 이후 90% 에 수렴
+    const pct = Math.min(90, 90 * (1 - Math.exp(-el / 4200)));
+    let msg = MSGS[0][1];
+    for(const [at, m] of MSGS){ if(el >= at) msg = m; }
+    setProgress(pct, msg);
+  }, 120);
+}
+function stopProgress(){ if(progTimer){ clearInterval(progTimer); progTimer = null; } }
+function finishProgress(){ stopProgress(); setProgress(100, '완료'); }
 function revealApp(){
-  setProgress(100, '완료');
+  finishProgress();
   setTimeout(()=>{
     document.getElementById('loader').classList.add('hide');
     document.getElementById('app').classList.remove('busy');
@@ -1792,7 +1822,7 @@ function renderAll(){ renderSched(); renderMedia(); renderDocs(); renderAssets()
 
 (async function init(){
   document.getElementById('app').classList.add('busy');
-  setProgress(12, '편성표를 불러오는 중…');
+  startProgress();   // 시간에 따라 자연스럽게 차오르는 게이지
 
   // ① 최신 편성
   try {
@@ -1800,7 +1830,6 @@ function renderAll(){ renderSched(); renderMedia(); renderDocs(); renderAssets()
     if(!ok) fallbackToDemo(null);
   } catch(err){ fallbackToDemo(err); }
 
-  setProgress(70, '화면을 준비하는 중…');
   renderAll();
   revealApp();
 
